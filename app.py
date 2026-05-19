@@ -1,17 +1,58 @@
-"""
-Resume Analyzer Main Application
-"""
 import streamlit as st
 
-def main():
-    st.set_page_config(
-        page_title="Resume Analyzer",
-        page_icon="📄",
-        layout="wide"
-    )
-    
-    st.title("Resume Analyzer")
-    st.write("Welcome to the Resume Analyzer application")
+from frontend.pages.dashboard import show_dashboard
+from frontend.pages.upload_resume import show_upload_resume
+from frontend.pages.ats_checker import show_ats_checker
+from frontend.pages.jd_match import show_jd_match
+from frontend.pages.ai_feedback import show_ai_feedback
+from frontend.pages.analytics import show_analytics
 
-if __name__ == "__main__":
-    main()
+# --------------------------------
+# PAGE CONFIG
+# --------------------------------
+
+st.set_page_config(
+    page_title="AI Resume Analyzer",
+    page_icon="📄",
+    layout="wide"
+)
+
+# --------------------------------
+# SIDEBAR
+# --------------------------------
+
+st.sidebar.title("Navigation")
+
+page = st.sidebar.radio(
+    "Go To",
+    [
+        "Dashboard",
+        "Upload Resume",
+        "ATS Checker",
+        "JD Match",
+        "AI Feedback",
+        "Analytics"
+    ]
+)
+
+# --------------------------------
+# PAGE ROUTING
+# --------------------------------
+
+if page == "Dashboard":
+    show_dashboard()
+
+elif page == "Upload Resume":
+    show_upload_resume()
+
+elif page == "ATS Checker":
+    show_ats_checker()
+
+elif page == "JD Match":
+    show_jd_match()
+
+elif page == "AI Feedback":
+    show_ai_feedback()
+
+elif page == "Analytics":
+    show_analytics()
