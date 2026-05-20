@@ -1,14 +1,20 @@
-"""
-Analytics Service
-"""
+from database.db import get_connection
+import pandas as pd
 
-class AnalyticsService:
-    """Service for analytics operations"""
-    
-    def get_user_stats(self, user_id):
-        """Get user statistics"""
-        pass
-    
-    def get_report_data(self, resume_id):
-        """Get report data for resume"""
-        pass
+def get_skill_data():
+
+    connection = get_connection()
+
+    query = """
+    SELECT
+        skill_name,
+        COUNT(*) as count
+    FROM resume_skills
+    GROUP BY skill_name
+    """
+
+    df = pd.read_sql(query, connection)
+
+    connection.close()
+
+    return df

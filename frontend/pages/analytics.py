@@ -1,20 +1,24 @@
 import streamlit as st
-import pandas as pd
+import plotly.express as px
+
+from backend.services.analytics_service import (
+    get_skill_data
+)
 
 def show_analytics():
 
     st.title("Resume Analytics")
 
-    data = pd.DataFrame({
-        "Category": [
-            "Python",
-            "SQL",
-            "AWS",
-            "Docker"
-        ],
-        "Count": [20, 15, 10, 12]
-    })
+    df = get_skill_data()
 
-    st.bar_chart(
-        data.set_index("Category")
+    fig = px.bar(
+        df,
+        x="skill_name",
+        y="count",
+        title="Top Skills"
+    )
+
+    st.plotly_chart(
+        fig,
+        use_container_width=True
     )
