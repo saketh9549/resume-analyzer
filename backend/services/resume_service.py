@@ -63,3 +63,86 @@ def analyze_resume(file_path):
         "education": education,
         "ats_score": ats_score
     }
+
+""""""
+
+def save_resume_analysis(
+    user_id,
+    result
+):
+
+    connection = get_connection()
+
+    cursor = connection.cursor()
+
+    query = """
+    INSERT INTO resumes
+    (
+        user_id,
+        resume_text,
+        summary,
+        total_experience,
+        education
+    )
+    VALUES (%s, %s, %s, %s, %s)
+    """
+
+    values = (
+        user_id,
+        result["text"],
+        "AI Generated Summary",
+        result["experience"],
+        ",".join(result["education"])
+    )
+
+    cursor.execute(query, values)
+
+    connection.commit()
+
+    resume_id = cursor.lastrowid
+
+    # -----------------------------------
+    # SAVE SKILLS
+    # -----------------------------------
+
+    for skill in result["skills"]:
+
+        skill_query = """
+        INSERT INTO resume_skills
+        (
+            resume_id,
+            skill_name
+        )
+        VALUES (%s, %s)
+        """
+
+        cursor.execute(
+            skill_query,
+            (resume_id, skill)
+        )
+
+    # -----------------------------------
+    # SAVE ATS SCORE
+    # -----------------------------------
+
+    ats_query = """
+    INSERT INTO resume_scores
+    (
+        resume_id,
+        overall_score
+    )
+    VALUES (%s, %s)
+    """
+
+    cursor.execute(
+        ats_query,
+        (
+            resume_id,
+            result["ats_score"]
+        )
+    )
+
+    connection.commit()
+
+    cursor.close()
+    connection.close()
