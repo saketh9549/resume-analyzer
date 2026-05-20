@@ -24,7 +24,7 @@ def show_upload_resume():
 
         st.markdown("---")
 
-        st.subheader("Extracted Skills")
+        st.subheader("Detected Skills")
 
         st.write(result["skills"])
 
@@ -39,6 +39,6 @@ def show_upload_resume():
         st.subheader("ATS Score")
 
         st.metric(
-            "Score",
+            "ATS Score",
             f"{result['ats_score']}%"
         )
