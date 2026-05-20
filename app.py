@@ -51,8 +51,12 @@ elif page == "ATS Checker":
 elif page == "JD Match":
     show_jd_match()
 
-elif page == "AI Feedback":
-    show_ai_feedback()
-
 elif page == "Analytics":
     show_analytics()
+
+try:
+    result = analyze_resume(file_path)
+
+except Exception as e:
+    st.error(str(e))
+
