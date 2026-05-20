@@ -1,9 +1,31 @@
 from openai import OpenAI
+
 import os
+
+
+
+from dotenv import load_dotenv
+
+import os
+
+# -----------------------------------
+# LOAD ENV VARIABLES
+# -----------------------------------
+
+load_dotenv()
+
+# -----------------------------------
+# OPENAI CLIENT
+# -----------------------------------
 
 client = OpenAI(
     api_key=os.getenv("OPENAI_API_KEY")
 )
+
+# -----------------------------------
+# AI FEEDBACK FUNCTION
+# -----------------------------------
+
 
 def get_resume_feedback(resume_text):
 
@@ -32,3 +54,12 @@ def get_resume_feedback(resume_text):
     )
 
     return response.choices[0].message.content
+
+    response = client.responses.create(
+
+        model="gpt-5.4-mini",
+
+        input=prompt
+    )
+
+    return response.output_text
