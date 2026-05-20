@@ -1,15 +1,12 @@
-"""
-Experience extraction module
-"""
+import re
 
-def extract_experience(resume_text):
-    """
-    Extract work experience from resume
-    
-    Args:
-        resume_text: Parsed resume text
-        
-    Returns:
-        List of extracted experiences
-    """
-    pass
+def extract_experience(text):
+
+    pattern = r"(\d+)\+?\s+years"
+
+    matches = re.findall(pattern, text.lower())
+
+    if matches:
+        return max([int(x) for x in matches])
+
+    return 0

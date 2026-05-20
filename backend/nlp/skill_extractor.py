@@ -1,15 +1,14 @@
-"""
-Skill extraction module
-"""
+from backend.utils.constants import SKILLS
 
-def extract_skills(resume_text):
-    """
-    Extract skills from resume
-    
-    Args:
-        resume_text: Parsed resume text
-        
-    Returns:
-        List of extracted skills
-    """
-    pass
+def extract_skills(text):
+
+    detected_skills = []
+
+    text = text.lower()
+
+    for skill in SKILLS:
+
+        if skill in text:
+            detected_skills.append(skill)
+
+    return detected_skills

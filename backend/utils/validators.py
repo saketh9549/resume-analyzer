@@ -1,15 +1,7 @@
-"""
-Validation utilities
-"""
+def validate_file(uploaded_file):
 
-def validate_email(email):
-    """Validate email address"""
-    pass
+    allowed_extensions = ["pdf", "docx"]
 
-def validate_file(file_path):
-    """Validate uploaded file"""
-    pass
+    extension = uploaded_file.name.split(".")[-1]
 
-def validate_resume_format(text):
-    """Validate resume format"""
-    pass
+    return extension in allowed_extensions

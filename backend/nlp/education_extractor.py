@@ -1,15 +1,18 @@
-"""
-Education extraction module
-"""
+def extract_education(text):
 
-def extract_education(resume_text):
-    """
-    Extract education details from resume
-    
-    Args:
-        resume_text: Parsed resume text
-        
-    Returns:
-        List of extracted education records
-    """
-    pass
+    education_keywords = [
+        "b.tech",
+        "m.tech",
+        "bachelor",
+        "master",
+        "phd"
+    ]
+
+    found = []
+
+    for edu in education_keywords:
+
+        if edu in text.lower():
+            found.append(edu)
+
+    return found

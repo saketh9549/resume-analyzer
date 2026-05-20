@@ -1,15 +1,9 @@
-"""
-Text cleaning utilities
-"""
+import re
 
 def clean_text(text):
-    """
-    Clean and normalize text
-    
-    Args:
-        text: Raw text to clean
-        
-    Returns:
-        Cleaned text
-    """
-    pass
+
+    text = re.sub(r"\s+", " ", text)
+
+    text = re.sub(r"[^\w\s]", "", text)
+
+    return text.strip()

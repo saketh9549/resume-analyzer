@@ -1,11 +1,17 @@
-"""
-AI Feedback page
-"""
 import streamlit as st
 
-def render_ai_feedback():
-    st.title("AI Feedback")
-    st.write("Get AI-powered suggestions for your resume")
+def show_ai_feedback():
 
-if __name__ == "__main__":
-    render_ai_feedback()
+    st.title("AI Resume Feedback")
+
+    st.write("""
+    Future AI features:
+    - Resume rewriting
+    - AI suggestions
+    - Cover letter generation
+    - Interview questions
+    """)
+
+    st.warning(
+        "AI Integration Coming Soon"
+    )

@@ -1,11 +1,29 @@
-"""
-Job Description Matching page
-"""
 import streamlit as st
 
-def render_jd_match():
-    st.title("Job Description Matching")
-    st.write("Match your resume against job descriptions")
+from backend.matching.jd_matcher import match_job_description
 
-if __name__ == "__main__":
-    render_jd_match()
+def show_jd_match():
+
+    st.title("Job Description Matching")
+
+    resume_text = st.text_area(
+        "Paste Resume Text"
+    )
+
+    job_description = st.text_area(
+        "Paste Job Description"
+    )
+
+    if st.button("Match Resume"):
+
+        score = match_job_description(
+            resume_text,
+            job_description
+        )
+
+        st.success("Matching Complete")
+
+        st.metric(
+            "Match Percentage",
+            f"{score}%"
+        )
