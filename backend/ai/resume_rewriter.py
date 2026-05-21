@@ -1,55 +1,10 @@
-from openai import OpenAI
+def rewrite_resume(*args, **kwargs):
+    return """
+    AI resume rewriting is temporarily disabled.
 
-import os
-
-
-from dotenv import load_dotenv
-
-import os
-
-load_dotenv()
-
-client = OpenAI(
-    api_key=os.getenv("OPENAI_API_KEY")
-)
-
-def rewrite_resume(resume_text):
-
-    prompt = f"""
-    Rewrite this resume professionally.
-
-    Improve:
-    - Grammar
-    - ATS optimization
-    - Professional tone
-    - Professional wording
-    - Bullet points
-    - Impact statements
-
-    Resume:
-    {resume_text}
+    Frontend and backend are working correctly.
+    OpenAI integration will be added later.
     """
 
-
-    response = client.chat.completions.create(
-
-        model="gpt-4.1-mini",
-
-        messages=[
-            {
-                "role": "user",
-                "content": prompt
-            }
-        ]
-    )
-
-    return response.choices[0].message.content
-    response = client.responses.create(
-
-        model="gpt-5.4-mini",
-
-        input=prompt
-    )
-
-    return response.output_text
-
+def rewrite_resume_section(*args, **kwargs):
+    return "Section rewrite temporarily disabled."
