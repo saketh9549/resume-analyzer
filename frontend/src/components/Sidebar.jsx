@@ -1,46 +1,121 @@
-import { Link } from "react-router-dom"
+import { Link, useLocation } from "react-router-dom"
 
-function Sidebar() {
+import {
+  LayoutDashboard,
+  Upload,
+  BarChart3
+} from "lucide-react"
+
+function Sidebar({ sidebarOpen, setSidebarOpen }) {
+
+  const location = useLocation()
+
+  const navItems = [
+    {
+      name: "Dashboard",
+      path: "/",
+      icon: <LayoutDashboard size={20} />
+    },
+    {
+      name: "Upload",
+      path: "/upload",
+      icon: <Upload size={20} />
+    },
+    {
+      name: "Analytics",
+      path: "/analytics",
+      icon: <BarChart3 size={20} />
+    }
+  ]
 
   return (
-    <div className="w-64 bg-slate-900 p-6">
 
-      <h1 className="text-3xl font-bold mb-10">
-        ResumeAI
-      </h1>
+    <div
+      className={`
+        bg-slate-900/80
+        backdrop-blur-lg
+        border-r
+        border-white/10
+        p-6
+        transition-all
+        duration-300
+        ${sidebarOpen ? "w-64" : "w-24"}
+      `}
+    >
 
+      {/* Top */}
+      <div className="flex items-center justify-between mb-10">
+
+        {
+          sidebarOpen && (
+            <h1 className="text-3xl font-bold">
+              ResumeAI
+            </h1>
+          )
+        }
+
+        <button
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          className="
+            bg-slate-800
+            p-2
+            rounded-xl
+            hover:bg-slate-700
+            transition
+          "
+        >
+          ☰
+        </button>
+
+      </div>
+
+      {/* Navigation */}
       <ul className="space-y-4">
 
-        <li>
-          <Link
-            to="/"
-            className="hover:text-blue-400"
-          >
-            Dashboard
-          </Link>
-        </li>
+        {
+          navItems.map((item, index) => (
 
-        <li>
-          <Link
-            to="/upload"
-            className="hover:text-blue-400"
-          >
-            Upload Resume
-          </Link>
-        </li>
+            <li key={index}>
 
-        <li>
-          <Link
-            to="/analytics"
-            className="hover:text-blue-400"
-          >
-            Analytics
-          </Link>
-        </li>
+              <Link
+                to={item.path}
+                className={`
+                  flex
+                  items-center
+                  gap-4
+                  p-3
+                  rounded-2xl
+                  transition-all
+                  duration-200
+                  hover:bg-white/10
+                  hover:translate-x-1
+
+                  ${location.pathname === item.path
+                    ? "bg-blue-500 text-white shadow-lg"
+                    : "text-gray-300"
+                  }
+                `}
+              >
+
+                {item.icon}
+
+                {
+                  sidebarOpen && (
+                    <span>{item.name}</span>
+                  )
+                }
+
+              </Link>
+
+            </li>
+
+          ))
+        }
 
       </ul>
 
     </div>
+
   )
 }
 
