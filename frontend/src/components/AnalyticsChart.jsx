@@ -43,6 +43,7 @@ function AnalyticsChart() {
               dataKey="score"
               stroke="#3b82f6"
               strokeWidth={3}
+              animationDuration={2000}
             />
 
           </LineChart>

@@ -39,7 +39,7 @@ function Sidebar({ sidebarOpen, setSidebarOpen }) {
         p-6
         transition-all
         duration-300
-        ${sidebarOpen ? "w-64" : "w-24"}
+        ${sidebarOpen ? "w-64" : "w-23"}
       `}
     >
 
@@ -64,7 +64,7 @@ function Sidebar({ sidebarOpen, setSidebarOpen }) {
             transition
           "
         >
-          ☰
+            {sidebarOpen ? "👈" : "👉"}
         </button>
 
       </div>

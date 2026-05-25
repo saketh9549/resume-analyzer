@@ -1,53 +1,122 @@
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate
+} from "react-router-dom"
+
 import { useState } from "react"
 
-import { BrowserRouter, Routes, Route } from "react-router-dom"
 import Sidebar from "./components/Sidebar"
 import Navbar from "./components/Navbar"
+
 import Dashboard from "./pages/Dashboard"
 import Upload from "./pages/Upload"
 import Analytics from "./pages/Analytics"
 
-function App() {
+import Login from "./pages/Login"
+import Signup from "./pages/Signup"
+
+function ProtectedRoute({ children }) {
+
+  const token = localStorage.getItem("token")
+
+  if (!token) {
+
+    return <Navigate to="/login" />
+  }
+
+  return children
+}
+
+function DashboardLayout() {
+
   const [sidebarOpen, setSidebarOpen] = useState(true)
+
   return (
 
-    <BrowserRouter>
-      
-      <div className="flex bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white min-h-screen">
+    <div
+      className="
+        flex
+        min-h-screen
+        bg-gradient-to-br
+        from-slate-950
+        via-slate-900
+        to-slate-950
+        text-white
+      "
+    >
 
-        <Sidebar
-          sidebarOpen={sidebarOpen}
-          setSidebarOpen={setSidebarOpen}
-        />
+      {/* SIDEBAR */}
+      <Sidebar
+        sidebarOpen={sidebarOpen}
+        setSidebarOpen={setSidebarOpen}
+      />
 
-        <div className="flex-1 p-10">
-          <Navbar />
+      {/* MAIN CONTENT */}
+      <div className="flex-1 p-10">
 
-          <Routes>
+        <Navbar />
 
-            <Route
-              path="/"
-              element={<Dashboard />}
-            />
+        <Routes>
 
-            <Route
-              path="/upload"
-              element={<Upload />}
-            />
+          <Route
+            path="/"
+            element={<Dashboard />}
+          />
 
-            <Route
-              path="/analytics"
-              element={<Analytics />}
-            />
+          <Route
+            path="/upload"
+            element={<Upload />}
+          />
 
-          </Routes>
+          <Route
+            path="/analytics"
+            element={<Analytics />}
+          />
 
-        </div>
+        </Routes>
 
       </div>
 
-    </BrowserRouter>
+    </div>
+  )
+}
 
+function App() {
+
+  return (
+
+    <BrowserRouter>
+
+      <Routes>
+
+        {/* AUTH ROUTES */}
+
+        <Route
+          path="/login"
+          element={<Login />}
+        />
+
+        <Route
+          path="/signup"
+          element={<Signup />}
+        />
+
+        {/* PROTECTED APP */}
+
+        <Route
+          path="/*"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout />
+            </ProtectedRoute>
+          }
+        />
+
+      </Routes>
+
+    </BrowserRouter>
   )
 }
 

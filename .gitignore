@@ -1,4 +1,22 @@
+# Python
+venv/
 __pycache__/
 *.pyc
+
+# Environment variables
 .env
+
+# Uploads
 uploads/
+
+# Node
+node_modules/
+
+# Vite
+dist/
+
+# VS Code
+.vscode/
+
+# OS files
+.DS_Store

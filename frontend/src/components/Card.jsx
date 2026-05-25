@@ -1,6 +1,14 @@
+import { motion } from "framer-motion"
+
+
 function Card(props) {
   return (
-    <div className="
+    <motion.div 
+        initial={{ opacity: 0, y: 30 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        
+    className="
         bg-white/5
         backdrop-blur-lg
         border
@@ -22,7 +30,7 @@ function Card(props) {
         {props.value}
       </p>
 
-    </div>
+    </motion.div>
   )
 }
 
