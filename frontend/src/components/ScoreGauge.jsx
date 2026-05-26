@@ -1,7 +1,7 @@
 import { CircularProgressbar } from "react-circular-progressbar"
 import "react-circular-progressbar/dist/styles.css"
 
-function ScoreGauge() {
+function ScoreGauge({ score = 0 }) {
 
   return (
 
@@ -23,8 +23,8 @@ function ScoreGauge() {
       <div className="w-48 mx-auto">
 
         <CircularProgressbar
-          value={82}
-          text="82%"
+          value={score}
+          text={`${score}%`}
         />
 
       </div>
@@ -33,5 +33,6 @@ function ScoreGauge() {
 
   )
 }
+
 
 export default ScoreGauge

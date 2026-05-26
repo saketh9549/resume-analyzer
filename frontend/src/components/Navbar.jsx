@@ -4,12 +4,19 @@ import { Link } from "react-router-dom"
 function Navbar({ darkMode, setDarkMode }) {
 
   const [dropdownOpen, setDropdownOpen] = useState(false)
-  const user = JSON.parse(
-  localStorage.getItem("user")
-)
+  
+  let user = null
+  try {
+    const rawUser = localStorage.getItem("user")
+    if (rawUser) {
+      user = JSON.parse(rawUser)
+    }
+  } catch (err) {
+    console.error("Failed to parse user details from local storage:", err)
+  }
 
-  // Fake auth state
-  const isLoggedIn = true
+  // Check actual auth token dynamically
+  const isLoggedIn = !!localStorage.getItem("token")
 
   return (
 
@@ -23,8 +30,9 @@ function Navbar({ darkMode, setDarkMode }) {
         </h1>
 
         <p className="text-gray-400 mt-2 text-lg">
-          Welcome back, Saketh
+          Welcome back, {user?.name || "User"}
         </p>
+
 
       </div>
 

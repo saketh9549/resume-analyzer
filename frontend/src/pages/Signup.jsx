@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom"
+import { Link, useNavigate } from "react-router-dom"
 import { useState } from "react"
 import { signupUser } from "../services/api"
 
@@ -7,8 +7,21 @@ function Signup() {
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const navigate = useNavigate()
 
   async function handleSignup() {
+    if (!name.strip && !name.trim()) {
+      alert("Please enter your name.")
+      return
+    }
+    if (!email.includes("@")) {
+      alert("Please enter a valid email address.")
+      return
+    }
+    if (password.length < 6) {
+      alert("Password must be at least 6 characters.")
+      return
+    }
 
     const response = await signupUser({
       name,
@@ -18,8 +31,14 @@ function Signup() {
 
     console.log(response)
 
-    alert(response.message || response.error)
+    if (response.error) {
+      alert(response.error)
+    } else {
+      alert(response.message || "Account created successfully!")
+      navigate("/login")
+    }
   }
+
 
   return (
 

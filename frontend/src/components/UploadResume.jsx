@@ -1,25 +1,37 @@
 import { useState } from "react"
 import ScoreGauge from "./ScoreGauge"
+import { uploadResume } from "../services/api"
 
 function UploadResume() {
 
   const [file, setFile] = useState(null)
   const [loading, setLoading] = useState(false)
   const [dragging, setDragging] = useState(false)
+  const [analysis, setAnalysis] = useState(null)
+  const [activeTab, setActiveTab] = useState("overview")
+
+  async function handleUpload(selectedFile) {
+    if (!selectedFile) return
+    setLoading(true)
+    try {
+      const response = await uploadResume(selectedFile)
+      if (response.error) {
+        alert(response.error)
+      } else {
+        setFile(selectedFile)
+        setAnalysis(response)
+      }
+    } catch (err) {
+      alert("Failed to analyze resume. Please try again.")
+      console.error(err)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   function handleFileChange(event) {
-
     const selectedFile = event.target.files[0]
-
-    setLoading(true)
-
-    setTimeout(() => {
-
-      setFile(selectedFile)
-
-      setLoading(false)
-
-    }, 2500)
+    handleUpload(selectedFile)
   }
 
   function handleDragOver(event) {
@@ -32,23 +44,12 @@ function UploadResume() {
   }
 
   function handleDrop(event) {
-
     event.preventDefault()
-
     setDragging(false)
-
     const droppedFile = event.dataTransfer.files[0]
-
-    setLoading(true)
-
-    setTimeout(() => {
-
-      setFile(droppedFile)
-
-      setLoading(false)
-
-    }, 2500)
+    handleUpload(droppedFile)
   }
+
 
   return (
 
@@ -252,85 +253,203 @@ function UploadResume() {
 
                 </div>
 
-                {/* FEEDBACK CARDS */}
-                <div className="grid grid-cols-2 gap-6">
-
-                  <div
-                    className="
-                      bg-slate-900/70
-                      p-6
-                      rounded-2xl
-                    "
-                  >
-
-                    <h3 className="text-lg font-semibold mb-3">
-                      ATS Score
-                    </h3>
-
-                    <p className="text-5xl font-bold text-blue-400">
-                      82%
-                    </p>
-
-                  </div>
-
-                  <div
-                    className="
-                      bg-slate-900/70
-                      p-6
-                      rounded-2xl
-                    "
-                  >
-
-                    <h3 className="text-lg font-semibold mb-3">
-                      Missing Skills
-                    </h3>
-
-                    <p className="text-gray-300">
-                      Docker, Kubernetes, AWS
-                    </p>
-
-                  </div>
-
-                </div>
-            <ScoreGauge />
-                {/* SUGGESTIONS */}
-                <div
-                  className="
-                    mt-6
-                    bg-slate-900/70
-                    p-5
-                    rounded-2xl
-                  "
-                >
-
-                  <h3 className="text-xl font-semibold mb-4">
-                    Suggestions
-                  </h3>
-
-                  <ul className="space-y-3 text-gray-300">
-
-                    <li>
-                      • Add more quantified achievements
-                    </li>
-
-                    <li>
-                      • Improve project descriptions
-                    </li>
-
-                    <li>
-                      • Include cloud technologies
-                    </li>
-
-                    <li>
-                      • Optimize resume keywords for ATS
-                    </li>
-
-                  </ul>
-
+                {/* TABS HEADERS */}
+                <div className="flex border-b border-white/10 mb-6 gap-1 overflow-x-auto scrollbar-none">
+                  {[
+                    { id: "overview", label: "Overview" },
+                    { id: "scoring", label: "Scoring breakdown" },
+                    { id: "experience", label: "Experience & Edu" },
+                    { id: "projects", label: "Projects & Certs" }
+                  ].map((tab) => (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`
+                        pb-3 px-4 text-sm font-semibold transition-all border-b-2 whitespace-nowrap
+                        ${activeTab === tab.id
+                          ? "border-blue-500 text-blue-400"
+                          : "border-transparent text-gray-400 hover:text-gray-200"
+                        }
+                      `}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
                 </div>
 
+                {/* TAB CONTENT */}
+                {activeTab === "overview" && (
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-2 gap-6">
+                      <div className="bg-slate-900/70 p-6 rounded-2xl border border-white/5">
+                        <h3 className="text-sm text-gray-400 font-semibold mb-2">ATS Match Score</h3>
+                        <p className="text-5xl font-extrabold text-blue-400">{analysis?.score || 0}%</p>
+                      </div>
+                      <div className="bg-slate-900/70 p-6 rounded-2xl border border-white/5">
+                        <h3 className="text-sm text-gray-400 font-semibold mb-2">Skills Found</h3>
+                        <p className="text-sm text-gray-200 line-clamp-3">
+                          {analysis?.skills_found && analysis.skills_found.length > 0
+                            ? analysis.skills_found.slice(0, 8).join(", ") + (analysis.skills_found.length > 8 ? "..." : "")
+                            : "None parsed"}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex justify-center py-4 bg-slate-900/40 rounded-2xl border border-white/5">
+                      <ScoreGauge score={analysis?.score || 0} />
+                    </div>
+
+                    {analysis?.detected_strengths && analysis.detected_strengths.length > 0 && (
+                      <div className="bg-green-500/10 p-5 rounded-2xl border border-green-500/20">
+                        <h4 className="text-green-400 font-bold text-sm mb-3">Detected Strengths</h4>
+                        <ul className="space-y-2 text-sm text-gray-300">
+                          {analysis.detected_strengths.map((str, idx) => (
+                            <li key={idx} className="flex gap-2 items-start">
+                              <span>✓</span> <span>{str}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {analysis?.optimization_recommendations && analysis.optimization_recommendations.length > 0 && (
+                      <div className="bg-blue-500/10 p-5 rounded-2xl border border-blue-500/20">
+                        <h4 className="text-blue-400 font-bold text-sm mb-3">Optimization Tips</h4>
+                        <ul className="space-y-2 text-sm text-gray-300">
+                          {analysis.optimization_recommendations.map((rec, idx) => (
+                            <li key={idx} className="flex gap-2 items-start">
+                              <span>•</span> <span>{rec}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {activeTab === "scoring" && (
+                  <div className="space-y-6 bg-slate-900/40 p-6 rounded-2xl border border-white/5">
+                    <h3 className="text-xl font-bold text-gray-200">ATS Scoring Dimension Breakdown</h3>
+                    {analysis?.category_scores ? (
+                      <div className="space-y-5">
+                        {Object.entries(analysis.category_scores).map(([category, val]) => (
+                          <div key={category} className="space-y-2">
+                            <div className="flex justify-between text-sm">
+                              <span className="text-gray-300 font-semibold capitalize">{category.replace(/_/g, ' ')}</span>
+                              <span className="font-bold text-blue-400">{val}%</span>
+                            </div>
+                            <div className="w-full bg-slate-900 rounded-full h-3">
+                              <div
+                                className="bg-blue-500 h-3 rounded-full transition-all duration-700 ease-out"
+                                style={{ width: `${val}%` }}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-gray-500 text-sm">No scoring breakdowns parsed.</p>
+                    )}
+                  </div>
+                )}
+
+                {activeTab === "experience" && (
+                  <div className="space-y-6">
+                    <div>
+                      <h3 className="text-lg font-bold mb-4 text-blue-400">Professional History</h3>
+                      {analysis?.experience && analysis.experience.length > 0 ? (
+                        <div className="space-y-4">
+                          {analysis.experience.map((job, idx) => (
+                            <div key={idx} className="bg-slate-900/60 p-5 rounded-2xl border border-white/5">
+                              <div className="flex justify-between items-start mb-3">
+                                <div>
+                                  <h4 className="font-bold text-gray-100">{job.job_title}</h4>
+                                  <p className="text-sm text-gray-400">{job.company}</p>
+                                </div>
+                                <span className="text-xs bg-blue-500/20 text-blue-400 px-3 py-1 rounded-full font-medium whitespace-nowrap">
+                                  {job.duration || "Duration N/A"}
+                                </span>
+                              </div>
+                              {job.responsibilities && job.responsibilities.length > 0 && (
+                                <ul className="list-disc pl-5 text-sm text-gray-300 space-y-1">
+                                  {job.responsibilities.map((resp, bIdx) => (
+                                    <li key={bIdx}>{resp}</li>
+                                  ))}
+                                </ul>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-gray-500 text-sm">No professional history block detected.</p>
+                      )}
+                    </div>
+
+                    <div className="border-t border-white/5 pt-6">
+                      <h3 className="text-lg font-bold mb-4 text-blue-400">Academic History</h3>
+                      {analysis?.education && analysis.education.length > 0 ? (
+                        <div className="space-y-3">
+                          {analysis.education.map((edu, idx) => (
+                            <div key={idx} className="bg-slate-900/60 p-4 rounded-2xl border border-white/5 flex justify-between items-center">
+                              <div>
+                                <h4 className="font-bold text-gray-100">{edu.degree}</h4>
+                                <p className="text-sm text-gray-400">{edu.institution}</p>
+                              </div>
+                              <span className="text-sm text-blue-400 font-bold whitespace-nowrap">{edu.year || "Year N/A"}</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-gray-500 text-sm">No academic history detected.</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {activeTab === "projects" && (
+                  <div className="space-y-6">
+                    <div>
+                      <h3 className="text-lg font-bold mb-4 text-blue-400">Project Highlights</h3>
+                      {analysis?.projects && analysis.projects.length > 0 ? (
+                        <div className="space-y-4">
+                          {analysis.projects.map((proj, idx) => (
+                            <div key={idx} className="bg-slate-900/60 p-5 rounded-2xl border border-white/5">
+                              <h4 className="font-bold text-gray-100 mb-2">{proj.name}</h4>
+                              <p className="text-sm text-gray-300 mb-3">{proj.description}</p>
+                              {proj.technologies && proj.technologies.length > 0 && (
+                                <div className="flex flex-wrap gap-2">
+                                  {proj.technologies.map((tech, tIdx) => (
+                                    <span key={tIdx} className="text-xs bg-slate-800 text-gray-400 px-2 py-1 rounded">
+                                      {tech}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-gray-500 text-sm">No projects parsed from document.</p>
+                      )}
+                    </div>
+
+                    <div className="border-t border-white/5 pt-6">
+                      <h3 className="text-lg font-bold mb-4 text-blue-400">Certifications & Awards</h3>
+                      {analysis?.certifications && analysis.certifications.length > 0 ? (
+                        <div className="bg-slate-900/60 p-5 rounded-2xl border border-white/5">
+                          <ul className="list-disc pl-5 text-sm text-gray-300 space-y-2">
+                            {analysis.certifications.map((cert, idx) => (
+                              <li key={idx}>{cert}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : (
+                        <p className="text-gray-500 text-sm">No certifications parsed from document.</p>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
-
             </div>
 
             {/* RIGHT SIDE */}

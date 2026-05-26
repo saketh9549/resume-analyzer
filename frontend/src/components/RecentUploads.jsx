@@ -1,26 +1,28 @@
-const uploads = [
-  {
-    name: "Resume_Developer.pdf",
-    score: "82%",
-    date: "2026-05-18"
-  },
-  {
-    name: "Resume_DataScience.pdf",
-    score: "76%",
-    date: "2026-05-17"
-  },
-  {
-    name: "Resume_Designer.pdf",
-    score: "91%",
-    date: "2026-05-15"
-  }
-]
+import { useState, useEffect } from "react"
+import { getRecentUploads } from "../services/api"
+import { Link } from "react-router-dom"
 
 function RecentUploads() {
+  const [uploads, setUploads] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function fetchUploads() {
+      try {
+        const data = await getRecentUploads()
+        setUploads(data)
+      } catch (err) {
+        console.error("Error fetching recent uploads:", err)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchUploads()
+  }, [])
 
   return (
 
-    <div className="bg-slate-900 p-6 rounded-2xl mt-10">
+    <div className="bg-slate-900 p-6 rounded-2xl mt-10 border border-white/5">
 
       <div className="flex items-center justify-between mb-6">
 
@@ -28,7 +30,8 @@ function RecentUploads() {
           Recent Uploads
         </h2>
 
-        <button
+        <Link
+          to="/upload"
           className="
             bg-blue-500
             px-4
@@ -36,10 +39,12 @@ function RecentUploads() {
             rounded-xl
             hover:bg-blue-600
             transition
+            text-sm
+            font-medium
           "
         >
-          View All
-        </button>
+          Upload New
+        </Link>
 
       </div>
 
@@ -55,43 +60,56 @@ function RecentUploads() {
         "
       >
 
-        <p>Resume</p>
+        <p>Resume Name</p>
         <p>ATS Score</p>
-        <p>Date</p>
+        <p>Upload Date</p>
 
       </div>
 
       {/* Table Rows */}
       <div className="mt-4 space-y-4">
 
-        {
+        {loading ? (
+          <div className="text-center py-6 text-gray-500">
+            Loading recent uploads...
+          </div>
+        ) : uploads.length === 0 ? (
+          <div className="text-center py-8 text-gray-400 bg-slate-800/40 rounded-xl">
+            <p className="mb-3">No resumes uploaded yet.</p>
+            <Link to="/upload" className="text-blue-400 hover:text-blue-300 underline text-sm">
+              Upload your first resume now
+            </Link>
+          </div>
+        ) : (
           uploads.map((upload, index) => (
 
             <div
-              key={index}
+              key={upload.id || index}
               className="
                 grid
                 grid-cols-3
                 bg-slate-800
                 p-4
                 rounded-xl
-                hover:bg-slate-700
+                hover:bg-slate-700/80
                 transition
+                border
+                border-white/5
               "
             >
 
-              <p>{upload.name}</p>
+              <p className="font-medium truncate pr-4">{upload.name}</p>
 
-              <p className="text-green-400">
+              <p className="text-green-400 font-semibold">
                 {upload.score}
               </p>
 
-              <p>{upload.date}</p>
+              <p className="text-gray-400">{upload.date}</p>
 
             </div>
 
           ))
-        }
+        )}
 
       </div>
 
@@ -99,5 +117,6 @@ function RecentUploads() {
 
   )
 }
+
 
 export default RecentUploads
