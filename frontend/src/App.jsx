@@ -2,109 +2,74 @@ import {
   BrowserRouter,
   Routes,
   Route,
-  Navigate,
-  Outlet
+  Navigate
 } from "react-router-dom"
 
-import { useState, useEffect } from "react"
-
-import Sidebar from "./components/Sidebar"
-import Navbar from "./components/Navbar"
+import { ThemeProvider } from "./context/ThemeContext"
+import DashboardLayout from "./layouts/DashboardLayout"
+import AuthLayout from "./layouts/AuthLayout"
 
 import Dashboard from "./pages/Dashboard"
 import Upload from "./pages/Upload"
+import JobMatching from "./pages/JobMatching"
+import ResumeRewriter from "./pages/ResumeRewriter"
+import InterviewPrep from "./pages/InterviewPrep"
+import LiveJobs from "./pages/LiveJobs"
+import RecruiterConsole from "./pages/RecruiterConsole"
 import Analytics from "./pages/Analytics"
+import Profile from "./pages/Profile"
+import Settings from "./pages/Settings"
 
 import Login from "./pages/Login"
 import Signup from "./pages/Signup"
 
+// ProtectedRoute authentication guard component
 function ProtectedRoute({ children }) {
   const token = localStorage.getItem("token")
 
   if (!token) {
-    return <Navigate to="/login" />
+    return <Navigate to="/login" replace />
   }
 
   return children
 }
 
-function DashboardLayout({ darkMode, setDarkMode }) {
-  const [sidebarOpen, setSidebarOpen] = useState(true)
-
-  return (
-    <div
-      className={`
-        flex
-        min-h-screen
-        transition-colors
-        duration-300
-        ${darkMode
-          ? "bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white"
-          : "bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 text-slate-800"
-        }
-      `}
-    >
-      {/* SIDEBAR */}
-      <Sidebar
-        sidebarOpen={sidebarOpen}
-        setSidebarOpen={setSidebarOpen}
-      />
-
-      {/* MAIN CONTENT */}
-      <div className="flex-1 p-10 overflow-y-auto">
-        <Navbar darkMode={darkMode} setDarkMode={setDarkMode} />
-        {/* Render child pages dynamically */}
-        <Outlet />
-      </div>
-    </div>
-  )
-}
-
 function App() {
-  const [darkMode, setDarkMode] = useState(() => {
-    const saved = localStorage.getItem("darkMode")
-    return saved !== "false" // Default to dark mode (true) if not set
-  })
-
-  useEffect(() => {
-    localStorage.setItem("darkMode", darkMode)
-    if (darkMode) {
-      document.documentElement.classList.add("dark")
-    } else {
-      document.documentElement.classList.remove("dark")
-    }
-  }, [darkMode])
-
   return (
-    <BrowserRouter>
-      <Routes>
-        {/* AUTH ROUTES */}
-        <Route
-          path="/login"
-          element={<Login />}
-        />
-        <Route
-          path="/signup"
-          element={<Signup />}
-        />
+    <ThemeProvider>
+      <BrowserRouter>
+        <Routes>
+          {/* AUTHENTICATION WRAPPER ROUTE GROUP */}
+          <Route element={<AuthLayout />}>
+            <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<Signup />} />
+          </Route>
 
-        {/* PROTECTED APP */}
-        <Route
-          element={
-            <ProtectedRoute>
-              <DashboardLayout darkMode={darkMode} setDarkMode={setDarkMode} />
-            </ProtectedRoute>
-          }
-        >
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/upload" element={<Upload />} />
-          <Route path="/analytics" element={<Analytics />} />
-        </Route>
+          {/* PROTECTED DASHBOARD CORE ROUTES */}
+          <Route
+            element={
+              <ProtectedRoute>
+                <DashboardLayout />
+              </ProtectedRoute>
+            }
+          >
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/upload" element={<Upload />} />
+            <Route path="/jobs" element={<JobMatching />} />
+            <Route path="/rewriter" element={<ResumeRewriter />} />
+            <Route path="/interviews" element={<InterviewPrep />} />
+            <Route path="/live-jobs" element={<LiveJobs />} />
+            <Route path="/recruiter" element={<RecruiterConsole />} />
+            <Route path="/analytics" element={<Analytics />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/settings" element={<Settings />} />
+          </Route>
 
-        {/* Catch-all redirect */}
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </BrowserRouter>
+          {/* Fallback route redirecting back to main landing index */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </BrowserRouter>
+    </ThemeProvider>
   )
 }
 

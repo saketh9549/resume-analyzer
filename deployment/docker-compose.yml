@@ -1,28 +1,69 @@
 version: '3.8'
 
 services:
-  app:
-    build: .
+  mongodb:
+    image: mongo:6.0
+    container_name: resume_analyzer_db
     ports:
-      - "8501:8501"
-    environment:
-      - STREAMLIT_SERVER_HEADLESS=true
+      - "27017:27017"
     volumes:
-      - ./uploads:/app/uploads
-      - ./reports:/app/reports
-    depends_on:
-      - db
+      - mongodb_data:/data/db
+    restart: unless-stopped
 
-  db:
-    image: postgres:14
-    environment:
-      - POSTGRES_DB=resume_analyzer
-      - POSTGRES_USER=admin
-      - POSTGRES_PASSWORD=password
+  redis:
+    image: redis:7-alpine
+    container_name: resume_analyzer_redis
     ports:
-      - "5432:5432"
+      - "6379:6379"
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ../
+      dockerfile: Dockerfile
+    container_name: resume_analyzer_backend
+    ports:
+      - "8000:8000"
+    environment:
+      - MONGO_URI=mongodb://mongodb:27017
+      - REDIS_URL=redis://redis:6379/0
+      - JWT_SECRET=resume_analyzer_secret_key
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - ../uploads:/app/uploads
+    depends_on:
+      - mongodb
+      - redis
+    restart: unless-stopped
+
+  celery_worker:
+    build:
+      context: ../
+      dockerfile: Dockerfile
+    container_name: resume_analyzer_worker
+    command: celery -A workers.celery_worker.celery_app worker --loglevel=info
+    environment:
+      - MONGO_URI=mongodb://mongodb:27017
+      - REDIS_URL=redis://redis:6379/0
+      - JWT_SECRET=resume_analyzer_secret_key
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+    volumes:
+      - ../uploads:/app/uploads
+    depends_on:
+      - redis
+      - mongodb
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    container_name: resume_analyzer_frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
 
 volumes:
-  postgres_data:
+  mongodb_data:

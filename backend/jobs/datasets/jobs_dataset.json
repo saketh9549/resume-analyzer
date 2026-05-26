@@ -1,0 +1,227 @@
+[
+  {
+    "job_title": "Frontend Developer",
+    "required_skills": ["React", "JavaScript", "TypeScript", "HTML", "CSS", "Tailwind", "Redux", "Webpack", "Vite", "Git"],
+    "experience_level": "Intermediate",
+    "experience_years_required": 3,
+    "industry": "Software Engineering",
+    "salary_range": "8-15 LPA",
+    "industry_tags": ["Web Development", "Frontend", "UI/UX", "SaaS"],
+    "responsibilities": [
+      "Develop responsive and modern web interfaces using React and Tailwind CSS.",
+      "Optimize frontend bundle sizes and application runtime performance.",
+      "Collaborate with backend engineers to integrate API payloads and JWT authentication."
+    ],
+    "preferred_education": "Bachelor's in Computer Science or equivalent experience"
+  },
+  {
+    "job_title": "Backend Developer",
+    "required_skills": ["Python", "FastAPI", "MongoDB", "PostgreSQL", "SQL", "Redis", "Docker", "Git", "REST APIs", "gRPC"],
+    "experience_level": "Intermediate",
+    "experience_years_required": 3,
+    "industry": "Software Engineering",
+    "salary_range": "10-18 LPA",
+    "industry_tags": ["Backend", "API Development", "Databases", "Distributed Systems"],
+    "responsibilities": [
+      "Design and maintain scalable REST APIs and backend services using FastAPI and Python.",
+      "Optimize MongoDB and PostgreSQL queries, aggregation pipelines, and indices.",
+      "Integrate cache layers using Redis and manage Docker containers for development."
+    ],
+    "preferred_education": "Bachelor's or Master's in Computer Science or related engineering field"
+  },
+  {
+    "job_title": "Full Stack Developer",
+    "required_skills": ["React", "Node.js", "Express", "MongoDB", "TypeScript", "JavaScript", "SQL", "Git", "Docker", "Tailwind"],
+    "experience_level": "Intermediate",
+    "experience_years_required": 4,
+    "industry": "Software Engineering",
+    "salary_range": "12-22 LPA",
+    "industry_tags": ["Full Stack", "Web Applications", "SaaS", "DevOps"],
+    "responsibilities": [
+      "Build complete end-to-end features from backend schema design to frontend UI rendering.",
+      "Develop secure authentication flows using JWTs, cookies, and middleware handlers.",
+      "Maintain CI/CD integrations and deploy containers on staging and production systems."
+    ],
+    "preferred_education": "Bachelor's in Computer Science, Software Engineering or equivalent experience"
+  },
+  {
+    "job_title": "DevOps Engineer",
+    "required_skills": ["Docker", "Kubernetes", "AWS", "CI/CD", "Linux", "Terraform", "Git", "Bash", "Python", "Prometheus"],
+    "experience_level": "Senior",
+    "experience_years_required": 5,
+    "industry": "Infrastructure & Operations",
+    "salary_range": "15-28 LPA",
+    "industry_tags": ["Infrastructure", "Cloud Computing", "Site Reliability", "Automation"],
+    "responsibilities": [
+      "Manage and orchestrate multi-container microservice deployments using Kubernetes.",
+      "Write infrastructure-as-code files using Terraform to provision AWS clouds.",
+      "Configure automated build and test pipelines (CI/CD) with GitHub Actions or GitLab."
+    ],
+    "preferred_education": "Bachelor's in Computer Science, Systems Engineering or related certifications"
+  },
+  {
+    "job_title": "AI/ML Engineer",
+    "required_skills": ["Python", "PyTorch", "TensorFlow", "Scikit-Learn", "Pandas", "NumPy", "Machine Learning", "Deep Learning", "SQL", "Git"],
+    "experience_level": "Senior",
+    "experience_years_required": 4,
+    "industry": "Artificial Intelligence",
+    "salary_range": "18-35 LPA",
+    "industry_tags": ["AI", "Machine Learning", "Data Science", "Generative AI"],
+    "responsibilities": [
+      "Design, train, and deploy custom neural networks and machine learning models.",
+      "Process large datasets, perform feature engineering, and optimize training times.",
+      "Integrate generative AI capabilities (LLMs, embeddings, RAG pipelines) into SaaS platforms."
+    ],
+    "preferred_education": "Master's or Ph.D. in AI, Machine Learning, Data Science, or related quantitative field"
+  },
+  {
+    "job_title": "Data Scientist",
+    "required_skills": ["Python", "SQL", "Pandas", "NumPy", "Scikit-Learn", "Tableau", "Machine Learning", "Statistics", "R", "Jupyter"],
+    "experience_level": "Intermediate",
+    "experience_years_required": 3,
+    "industry": "Data & Analytics",
+    "salary_range": "10-20 LPA",
+    "industry_tags": ["Analytics", "Business Intelligence", "Machine Learning", "Big Data"],
+    "responsibilities": [
+      "Analyze business metrics, build predictive models, and perform exploratory data analysis.",
+      "Design and execute A/B testing trials to evaluate platform feature enhancements.",
+      "Construct interactive dashboard reports in Tableau or PowerBI for management teams."
+    ],
+    "preferred_education": "Bachelor's or Master's in Statistics, Mathematics, Economics, or Computer Science"
+  },
+  {
+    "job_title": "Mobile Developer",
+    "required_skills": ["React Native", "Flutter", "Swift", "Kotlin", "Android", "iOS", "JavaScript", "TypeScript", "Git", "REST APIs"],
+    "experience_level": "Intermediate",
+    "experience_years_required": 3,
+    "industry": "Software Engineering",
+    "salary_range": "8-16 LPA",
+    "industry_tags": ["Mobile App Development", "Android", "iOS", "Cross-Platform"],
+    "responsibilities": [
+      "Develop cross-platform mobile apps for Android and iOS devices using React Native or Flutter.",
+      "Optimize application launch speeds, page rendering animations, and offline storage systems.",
+      "Publish and manage application lifecycle updates on App Store and Google Play."
+    ],
+    "preferred_education": "Bachelor's in Computer Science, Mobile Systems or equivalent experience"
+  },
+  {
+    "job_title": "QA Engineer",
+    "required_skills": ["Selenium", "Cypress", "Jest", "Python", "JavaScript", "QA", "Automation", "Git", "Postman", "CI/CD"],
+    "experience_level": "Junior",
+    "experience_years_required": 2,
+    "industry": "Quality Assurance",
+    "salary_range": "5-10 LPA",
+    "industry_tags": ["Testing", "Automation QA", "Manual Testing", "CI/CD"],
+    "responsibilities": [
+      "Write automated integration, end-to-end, and API test scripts in Cypress and Selenium.",
+      "Log detailed defect logs, perform regression testing, and design manual test coverage cases.",
+      "Embed test assertions within CI/CD pipelines to block regression bugs."
+    ],
+    "preferred_education": "Bachelor's in Computer Science or IT related field"
+  },
+  {
+    "job_title": "Cloud Architect",
+    "required_skills": ["AWS", "Azure", "Terraform", "Cloud Security", "Networking", "Architecture", "Kubernetes", "Linux", "CI/CD"],
+    "experience_level": "Senior",
+    "experience_years_required": 7,
+    "industry": "Infrastructure & Operations",
+    "salary_range": "20-40 LPA",
+    "industry_tags": ["Enterprise Cloud", "Security Architecture", "Disaster Recovery", "Cost Optimization"],
+    "responsibilities": [
+      "Design highly-available, secure, fault-tolerant enterprise cloud solutions on AWS/Azure.",
+      "Lead migrations from on-premise hardware databases into hybrid-cloud configurations.",
+      "Establish guidelines for security auditing, identity management, and cost optimization."
+    ],
+    "preferred_education": "Bachelor's or Master's in Systems Engineering + AWS Solutions Architect Professional certification"
+  },
+  {
+    "job_title": "Cyber Security Specialist",
+    "required_skills": ["Penetration Testing", "Network Security", "Linux", "Cryptographic Protocols", "Firewalls", "Wireshark", "Python", "OWASP", "SIEM"],
+    "experience_level": "Senior",
+    "experience_years_required": 5,
+    "industry": "Security & compliance",
+    "salary_range": "14-26 LPA",
+    "industry_tags": ["Cybersecurity", "Penetration Testing", "Security Auditing", "Risk Management"],
+    "responsibilities": [
+      "Execute periodic penetration tests and vulnerability checks across server environments.",
+      "Configure firewalls, intrusion detection mechanisms, and audit logging pipelines.",
+      "Perform incident response, forensic analyses, and verify compliance with standards."
+    ],
+    "preferred_education": "Bachelor's in Computer Security or related certificates (CEH, CISSP, OSCP)"
+  },
+  {
+    "job_title": "Data Engineer",
+    "required_skills": ["SQL", "Python", "Spark", "Hadoop", "Kafka", "ETL", "Databases", "Airflow", "Docker", "Git"],
+    "experience_level": "Intermediate",
+    "experience_years_required": 3,
+    "industry": "Data Engineering",
+    "salary_range": "10-20 LPA",
+    "industry_tags": ["Data Pipeline", "ETL", "Big Data", "Data Warehousing"],
+    "responsibilities": [
+      "Build and maintain robust ETL pipelines to ingest and transform enterprise scale data streams.",
+      "Construct real-time messaging structures using Kafka and batch processes using Apache Spark.",
+      "Manage job workflow scheduling using Apache Airflow and orchestrate database scaling."
+    ],
+    "preferred_education": "Bachelor's in Computer Science, Data Engineering, or equivalent experience"
+  },
+  {
+    "job_title": "UI/UX Designer",
+    "required_skills": ["Figma", "Adobe XD", "Wireframing", "Prototyping", "CSS", "HTML", "UI/UX Design", "Framer", "Git"],
+    "experience_level": "Intermediate",
+    "experience_years_required": 3,
+    "industry": "Design & Creatives",
+    "salary_range": "6-12 LPA",
+    "industry_tags": ["UI/UX Design", "Product Design", "Wireframes", "User Research"],
+    "responsibilities": [
+      "Create high-fidelity wireframes, UI graphics, and interactive user-journey prototypes in Figma.",
+      "Perform user research interviews, analyze accessibility standards, and compile style sheets.",
+      "Work closely with frontend engineers to translate layouts into pixel-perfect CSS components."
+    ],
+    "preferred_education": "Bachelor's or Diploma in Design, UI/UX, Fine Arts or equivalent portfolio"
+  },
+  {
+    "job_title": "Product Manager",
+    "required_skills": ["Agile", "Jira", "Product Roadmap", "Analytics", "SQL", "Communication", "Scrum", "Market Research"],
+    "experience_level": "Senior",
+    "experience_years_required": 5,
+    "industry": "Product Management",
+    "salary_range": "15-28 LPA",
+    "industry_tags": ["Agile", "Product Lifecycle", "Product Strategy", "SaaS Management"],
+    "responsibilities": [
+      "Define product requirements, roadmap schedules, and maintain project backlog boards in Jira.",
+      "Conduct customer feedback sessions and write comprehensive product specification documents.",
+      "Direct cross-functional squads (Dev, Design, QA) to execute sprints and ship deliverables."
+    ],
+    "preferred_education": "Bachelor's in Engineering/Science or Business Management degree"
+  },
+  {
+    "job_title": "Embedded Systems Engineer",
+    "required_skills": ["C", "C++", "RTOS", "Microcontrollers", "Firmware", "Linux", "IoT", "Git", "Debugging", "I2C/SPI"],
+    "experience_level": "Intermediate",
+    "experience_years_required": 4,
+    "industry": "Hardware & Embedded Systems",
+    "salary_range": "10-18 LPA",
+    "industry_tags": ["Embedded Systems", "Firmware Development", "IoT", "Hardware Interface"],
+    "responsibilities": [
+      "Develop low-level microcode and firmware for Cortex-M microcontrollers using C/C++.",
+      "Implement real-time task scheduling routines using FreeRTOS or embedded Linux layers.",
+      "Debug physical boards using logic analyzers, digital oscilloscopes, and hardware JTAG interfaces."
+    ],
+    "preferred_education": "Bachelor's or Master's in Electronics, Electrical Engineering, or Embedded Systems"
+  },
+  {
+    "job_title": "Systems Administrator",
+    "required_skills": ["Linux", "Bash", "Active Directory", "Networking", "Scripting", "DNS", "DHCP", "PowerShell", "Git"],
+    "experience_level": "Intermediate",
+    "experience_years_required": 3,
+    "industry": "Infrastructure & Operations",
+    "salary_range": "7-13 LPA",
+    "industry_tags": ["SysAdmin", "Networking", "Linux OS", "Security Compliance"],
+    "responsibilities": [
+      "Install, secure, and maintain enterprise internal Linux/Windows servers.",
+      "Manage network policies, DNS databases, active user directories, and storage volumes.",
+      "Write scripts in Bash or PowerShell to automate routine backup and user setups."
+    ],
+    "preferred_education": "Bachelor's in IT, Networking, System Administration, or related certifications"
+  }
+]

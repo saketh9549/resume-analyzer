@@ -285,4 +285,185 @@ async def get_resume_analytics(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to fetch analytics: {str(e)}"
         )
+
+from fastapi.responses import FileResponse
+from pydantic import BaseModel
+from multimodal.multimodal_service import MultimodalService
+
+class RenameRequest(BaseModel):
+    name: str
+
+@router.delete("/{resume_id}")
+async def delete_resume(
+    resume_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    if resumes_collection is None:
+        raise HTTPException(status_code=503, detail="Database service offline.")
+
+    try:
+        doc = resumes_collection.find_one({
+            "_id": ObjectId(resume_id),
+            "user_email": current_user["email"]
+        })
+        if not doc:
+            raise HTTPException(status_code=404, detail="Resume record not found.")
+
+        # Delete physical file on disk
+        file_path = doc.get("file_path", "")
+        if file_path and os.path.exists(file_path):
+            try:
+                os.remove(file_path)
+            except Exception as fe:
+                print(f"Failed to delete physical file: {fe}")
+
+        # Delete document from resumes collection
+        resumes_collection.delete_one({"_id": ObjectId(resume_id)})
+
+        # Cascaded cleanups of linked collections to prevent DB bloat
+        from database.mongodb import db
+        if db is not None:
+            db["ai_feedback"].delete_many({"resume_id": ObjectId(resume_id)})
+            db["job_matches"].delete_many({"resume_id": ObjectId(resume_id)})
+            db["interview_sessions"].delete_many({"resume_id": ObjectId(resume_id)})
+            db["rewrite_history"].delete_many({"resume_id": ObjectId(resume_id)})
+            db["multimodal_analyses"].delete_many({"resume_id": ObjectId(resume_id)})
+
+        return {"message": "Resume and linked insights deleted successfully"}
+    except Exception as e:
+        if isinstance(e, HTTPException):
+            raise e
+        raise HTTPException(status_code=500, detail=f"Delete failed: {str(e)}")
+
+@router.put("/{resume_id}/rename")
+async def rename_resume(
+    resume_id: str,
+    payload: RenameRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    if resumes_collection is None:
+        raise HTTPException(status_code=503, detail="Database service offline.")
+
+    try:
+        doc = resumes_collection.find_one({
+            "_id": ObjectId(resume_id),
+            "user_email": current_user["email"]
+        })
+        if not doc:
+            raise HTTPException(status_code=404, detail="Resume record not found.")
+
+        # Update filename in MongoDB
+        resumes_collection.update_one(
+            {"_id": ObjectId(resume_id)},
+            {"$set": {"filename": payload.name}}
+        )
+
+        return {"message": "Resume renamed successfully", "name": payload.name}
+    except Exception as e:
+        if isinstance(e, HTTPException):
+            raise e
+        raise HTTPException(status_code=500, detail=f"Rename failed: {str(e)}")
+
+@router.get("/{resume_id}/download")
+async def download_resume(
+    resume_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    if resumes_collection is None:
+        raise HTTPException(status_code=503, detail="Database service offline.")
+
+    try:
+        doc = resumes_collection.find_one({
+            "_id": ObjectId(resume_id),
+            "user_email": current_user["email"]
+        })
+        if not doc:
+            raise HTTPException(status_code=404, detail="Resume record not found.")
+
+        file_path = doc.get("file_path", "")
+        if not file_path or not os.path.exists(file_path):
+            raise HTTPException(status_code=404, detail="Physical file does not exist on server.")
+
+        return FileResponse(
+            path=file_path,
+            filename=doc.get("filename", "resume.pdf"),
+            media_type="application/pdf"
+        )
+    except Exception as e:
+        if isinstance(e, HTTPException):
+            raise e
+        raise HTTPException(status_code=500, detail=f"Download failed: {str(e)}")
+
+@router.post("/{resume_id}/reanalyze")
+async def reanalyze_resume(
+    resume_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    if resumes_collection is None:
+        raise HTTPException(status_code=503, detail="Database service offline.")
+
+    try:
+        doc = resumes_collection.find_one({
+            "_id": ObjectId(resume_id),
+            "user_email": current_user["email"]
+        })
+        if not doc:
+            raise HTTPException(status_code=404, detail="Resume record not found.")
+
+        file_path = doc.get("file_path", "")
+        if not file_path or not os.path.exists(file_path):
+            raise HTTPException(status_code=404, detail="Physical file missing.")
+
+        # Re-run extraction, parsing, and scoring pipeline
+        text = extract_text(file_path)
+        parsed_data = parse_resume(text)
+        scoring = calculate_ats_score(parsed_data, text)
+
+        # Update Mongo document
+        resumes_collection.update_one(
+            {"_id": ObjectId(resume_id)},
+            {"$set": {
+                "parsed_text": text,
+                "skills": parsed_data["skills"],
+                "education": parsed_data["education"],
+                "projects": parsed_data["projects"],
+                "experience": parsed_data["experience"],
+                "certifications": parsed_data["certifications"],
+                "contact": parsed_data["contact"],
+                "ats_score": scoring["score"],
+                "category_scores": scoring["category_scores"],
+                "missing_skills": scoring["missing_skills"],
+                "suggestions": scoring["suggestions"],
+                "detected_strengths": scoring["detected_strengths"],
+                "optimization_recommendations": scoring["optimization_recommendations"],
+                "date": datetime.now(timezone.utc).isoformat()
+            }}
+        )
+
+        return {
+            "message": "Resume reanalyzed successfully",
+            "id": resume_id,
+            "score": scoring["score"],
+            "skills_found": parsed_data["skills"]
+        }
+    except Exception as e:
+        if isinstance(e, HTTPException):
+            raise e
+        raise HTTPException(status_code=500, detail=f"Re-analysis failed: {str(e)}")
+
+@router.post("/{resume_id}/multimodal-analyze")
+async def multimodal_analyze(
+    resume_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    try:
+        result = await MultimodalService.analyze_resume_visuals(resume_id, current_user["email"])
+        return result
+    except FileNotFoundError as fnf:
+        raise HTTPException(status_code=404, detail=str(fnf))
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Multimodal vision audit failed: {str(e)}")
+
 
