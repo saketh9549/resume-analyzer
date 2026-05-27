@@ -3,8 +3,10 @@ import { motion } from "framer-motion"
 import { getDashboardStats, getRecentUploads } from "../services/api"
 import ProfileCard from "../components/ProfileCard"
 import { User, Mail, Calendar, FileText, TrendingUp, Briefcase } from "lucide-react"
+import { useToast } from "../context/ToastContext"
 
 function Profile() {
+  const { showToast } = useToast()
   const [user, setUser] = useState(() => {
     try {
       const raw = localStorage.getItem("user")
@@ -28,10 +30,29 @@ function Profile() {
 
   useEffect(() => {
     async function loadData() {
-      const dashboardStats = await getDashboardStats()
-      const recentUploads = await getRecentUploads()
-      if (dashboardStats) setStats(dashboardStats)
-      if (recentUploads) setUploads(recentUploads)
+      try {
+        const dashboardStats = await getDashboardStats()
+        if (dashboardStats) {
+          if (dashboardStats.error) {
+            showToast(`Failed to load stats: ${dashboardStats.error}`, "error")
+          } else {
+            setStats(dashboardStats)
+          }
+        }
+        
+        const recentUploads = await getRecentUploads()
+        if (recentUploads) {
+          if (recentUploads.error) {
+            showToast(`Failed to load recent uploads: ${recentUploads.error}`, "error")
+            setUploads([])
+          } else {
+            setUploads(recentUploads)
+          }
+        }
+      } catch (err) {
+        console.error(err)
+        showToast("An unexpected error occurred while loading profile data.", "error")
+      }
     }
     loadData()
   }, [])

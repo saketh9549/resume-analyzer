@@ -94,7 +94,7 @@ async def fetch_and_cache_jobs() -> list:
             cache_doc = live_jobs_cache_collection.find_one({"type": "remotive_cache"})
             if cache_doc:
                 return cache_doc.get("jobs", [])
-        except:
+        except Exception:
             pass
         return MOCK_LIVE_JOBS
 
@@ -113,7 +113,7 @@ async def get_live_job_recommendations(
         if not skills and resumes_collection is not None:
             last_resume = resumes_collection.find_one(
                 {"user_email": current_user["email"]},
-                sort=[("date", -1)]
+                sort=[("upload_date", -1)]
             )
             if last_resume:
                 user_skills = [s.lower() for s in last_resume.get("skills", [])]

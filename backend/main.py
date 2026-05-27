@@ -1,5 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+import warnings
+
+# Suppress deprecation warnings from google.generativeai (scheduled for migration to google.genai)
+warnings.filterwarnings("ignore", category=FutureWarning, module="google.generativeai")
+warnings.filterwarnings("ignore", category=FutureWarning, message=".*google.generativeai.*")
 from routes.auth import router as auth_router
 from routes.resume import router as resume_router
 from routes.ai import router as ai_router

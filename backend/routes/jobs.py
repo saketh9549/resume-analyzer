@@ -9,6 +9,8 @@ from database.mongodb import db, resumes_collection
 from jobs.job_matcher import JobMatcherCoordinator
 from jobs.scoring_engine import ScoringEngine
 from jobs.recommendation_engine import JobRecommendationEngine
+from jobs.skill_matcher import SkillMatcher
+
 
 router = APIRouter()
 

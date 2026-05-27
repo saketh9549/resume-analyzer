@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react"
+import { useToast } from "../context/ToastContext"
 import { motion, AnimatePresence } from "framer-motion"
 import { 
   getRecentUploads, 
@@ -22,6 +23,7 @@ import {
 } from "lucide-react"
 
 function InterviewPrep() {
+  const { showToast } = useToast()
   const [resumes, setResumes] = useState([])
   const [selectedResumeId, setSelectedResumeId] = useState("")
   const [loadingResumes, setLoadingResumes] = useState(true)
@@ -47,15 +49,21 @@ function InterviewPrep() {
     async function loadInitialData() {
       try {
         const data = await getRecentUploads()
-        setResumes(data)
-        if (data && data.length > 0) {
-          setSelectedResumeId(data[0].id)
+        if (data && data.error) {
+          showToast(`Failed to load resumes: ${data.error}`, "error")
+          setResumes([])
+        } else {
+          setResumes(data || [])
+          if (data && data.length > 0) {
+            setSelectedResumeId(data[0].id)
+          }
         }
         
         const hist = await getInterviewHistory()
         setHistory(hist)
       } catch (err) {
         console.error(err)
+        showToast("An unexpected error occurred while loading dashboard data.", "error")
       } finally {
         setLoadingResumes(false)
       }

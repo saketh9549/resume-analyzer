@@ -29,7 +29,23 @@ class MultimodalService:
         if not resume:
             raise FileNotFoundError("Resume record not found or access denied.")
 
+        gridfs_file_id = resume.get("gridfs_file_id")
         file_path = resume.get("file_path", "")
+        temp_file_path = None
+
+        if gridfs_file_id:
+            import tempfile
+            from storage.gridfs_service import GridFSService
+            try:
+                file_bytes = GridFSService.read_file(ObjectId(gridfs_file_id))
+                suffix = os.path.splitext(resume.get("filename", ".pdf"))[1].lower()
+                temp_file_fd, temp_file_path = tempfile.mkstemp(suffix=suffix)
+                with os.fdopen(temp_file_fd, 'wb') as temp_file:
+                    temp_file.write(file_bytes)
+                file_path = temp_file_path
+            except Exception as e:
+                logger.error(f"Failed to fetch file from GridFS for vision audit: {e}")
+
         if not file_path or not os.path.exists(file_path):
             # Fall back to checking if the file is in uploads directory
             file_path = f"uploads/{resume.get('filename')}"
@@ -37,7 +53,15 @@ class MultimodalService:
                 raise FileNotFoundError(f"Physical file not found at path: {file_path}")
 
         # 2. Extract first page image from PDF
-        images = convert_pdf_to_images(file_path, max_pages=1)
+        try:
+            images = convert_pdf_to_images(file_path, max_pages=1)
+        finally:
+            if temp_file_path and os.path.exists(temp_file_path):
+                try:
+                    os.remove(temp_file_path)
+                except Exception as e:
+                    logger.error(f"Failed to delete temp file: {e}")
+
         if not images:
             raise ValueError("Failed to extract pages as images from the PDF document.")
         

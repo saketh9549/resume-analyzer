@@ -5,6 +5,7 @@ import unittest
 # Add backend directory to Python path to enable correct package imports
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'backend'))
 
+# pyrefly: ignore [missing-import]
 from services.resume_service import analyze_resume_text
 
 class TestATSScore(unittest.TestCase):

@@ -4,6 +4,7 @@ import unittest
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'backend'))
 
+# pyrefly: ignore [missing-import]
 from services.resume_service import analyze_resume_text
 
 class TestSkillExtraction(unittest.TestCase):

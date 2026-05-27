@@ -1,9 +1,14 @@
 import os
 import logging
 import asyncio
+import warnings
 from functools import partial
 from PIL import Image
+# Suppress FutureWarning from deprecated google.generativeai package during import
+_original_filters = warnings.filters[:]
+warnings.simplefilter("ignore", category=FutureWarning)
 import google.generativeai as genai
+warnings.filters = _original_filters
 from ai.response_parser import parse_ai_response
 
 logger = logging.getLogger(__name__)

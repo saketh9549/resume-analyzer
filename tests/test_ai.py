@@ -1,11 +1,19 @@
 import sys
 import os
 import unittest
+import warnings
+
+# Suppress FutureWarnings and ResourceWarnings
+warnings.simplefilter("ignore", category=FutureWarning)
+warnings.simplefilter("ignore", category=ResourceWarning)
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'backend'))
 
+# pyrefly: ignore [missing-import]
 from ai.response_parser import clean_gemini_json_string, parse_ai_response
+# pyrefly: ignore [missing-import]
 from ai.prompts.feedback_prompt import get_feedback_prompt
+# pyrefly: ignore [missing-import]
 from ai.gemini_service import FEEDBACK_FALLBACK
 
 class TestAIResponseParser(unittest.TestCase):

@@ -13,3 +13,4 @@ class UserSchema(MongoBaseModel):
     created_at: datetime = Field(default_factory=datetime.utcnow, description="Timestamp when user was created")
     last_login: Optional[datetime] = Field(default=None, description="Timestamp of the last login session")
     is_active: bool = Field(default=True, description="Indicates if the user account is active")
+    role: str = Field(default="candidate", description="Role of the user: candidate, recruiter, or admin")

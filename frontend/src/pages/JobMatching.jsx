@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react"
+import { useToast } from "../context/ToastContext"
 import { motion, AnimatePresence } from "framer-motion"
 import { 
   getRecentUploads, 
@@ -41,6 +42,7 @@ import {
 } from "recharts"
 
 function JobMatching() {
+  const { showToast } = useToast()
   // Resume states
   const [resumes, setResumes] = useState([])
   const [selectedResumeId, setSelectedResumeId] = useState("")
@@ -82,14 +84,20 @@ function JobMatching() {
     async function loadResumes() {
       try {
         const data = await getRecentUploads()
-        setResumes(data)
-        if (data && data.length > 0) {
-          setSelectedResumeId(data[0].id)
-          // Pre-fetch existing matches if any
-          fetchExistingMatches(data[0].id)
+        if (data && data.error) {
+          showToast(`Failed to load resumes: ${data.error}`, "error")
+          setResumes([])
+        } else {
+          setResumes(data || [])
+          if (data && data.length > 0) {
+            setSelectedResumeId(data[0].id)
+            // Pre-fetch existing matches if any
+            fetchExistingMatches(data[0].id)
+          }
         }
       } catch (err) {
         console.error("Failed to load resumes:", err)
+        showToast("An unexpected error occurred while loading resumes.", "error")
       } finally {
         setLoadingResumes(false)
       }

@@ -78,7 +78,7 @@ async def rewrite_resume_section(
             }}
             """
             
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             generation_config = {"response_mime_type": "application/json"}
             
             response = await loop.run_in_executor(

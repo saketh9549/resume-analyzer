@@ -1,14 +1,26 @@
 import sys
 import os
 import unittest
+import warnings
+
+# Suppress FutureWarnings and ResourceWarnings
+warnings.simplefilter("ignore", category=FutureWarning)
+warnings.simplefilter("ignore", category=ResourceWarning)
+
+# Mongo cleanup is handled centrally in tests/__init__.py
 
 backend_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'backend'))
 sys.path.insert(0, backend_path)
 
+# pyrefly: ignore [missing-import]
 from multimodal.layout_scoring import LayoutScorer
+# pyrefly: ignore [missing-import]
 from multimodal.readability_engine import ReadabilityEngine
+# pyrefly: ignore [missing-import]
 from multimodal.pdf_image_extractor import convert_pdf_to_images
+# pyrefly: ignore [missing-import]
 from rag.chunking_engine import ChunkingEngine
+# pyrefly: ignore [missing-import]
 from rag.prompt_builder import PromptBuilder
 
 class TestPDFImageExtractor(unittest.TestCase):

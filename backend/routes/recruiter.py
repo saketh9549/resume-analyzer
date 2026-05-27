@@ -5,22 +5,33 @@ from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
-from services.auth_service import get_current_user
 from database.mongodb import db, resumes_collection
 from embeddings.similarity_engine import SimilarityEngine
+from middleware.role_guard import RoleGuard
 
 router = APIRouter()
 
 shortlists_collection = db["shortlists"] if db is not None else None
+recruiter_jobs_collection = db["recruiter_jobs"] if db is not None else None
+
+logger = logging.getLogger(__name__)
 
 class ShortlistAddRequest(BaseModel):
     resume_id: str
     notes: Optional[str] = ""
 
+class JobPostRequest(BaseModel):
+    title: str = Field(..., min_length=1)
+    description: str = Field(..., min_length=1)
+    department: Optional[str] = "Engineering"
+    required_skills: Optional[List[str]] = Field(default_factory=list)
+    experience_years_required: Optional[int] = 0
+    location: Optional[str] = "Remote"
+
 @router.get("/candidates")
 async def search_candidates(
     query: Optional[str] = "",
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(RoleGuard(["recruiter", "admin"]))
 ):
     if resumes_collection is None:
         return []
@@ -46,6 +57,14 @@ async def search_candidates(
 
         # 1. Semantic search if query is provided
         if query and query.strip():
+            from vector_db.semantic_search import search_candidates_semantic
+            try:
+                # Use semantic vector db query
+                ranked = await search_candidates_semantic(query.strip(), top_k=20)
+                return ranked
+            except Exception as se_err:
+                logger.error(f"Semantic search failed: {se_err}. Falling back to standard matching.")
+                
             ranked = await SimilarityEngine.match_query_to_documents(
                 query=query.strip(),
                 documents=all_resumes,
@@ -68,7 +87,7 @@ async def search_candidates(
 @router.post("/shortlist/add")
 async def add_candidate_to_shortlist(
     payload: ShortlistAddRequest,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(RoleGuard(["recruiter", "admin"]))
 ):
     if shortlists_collection is None or resumes_collection is None:
         raise HTTPException(status_code=503, detail="Database offline.")
@@ -106,7 +125,7 @@ async def add_candidate_to_shortlist(
 
 @router.get("/shortlist")
 async def get_recruiter_shortlist(
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(RoleGuard(["recruiter", "admin"]))
 ):
     if shortlists_collection is None:
         return {"candidates": []}
@@ -130,31 +149,116 @@ async def get_recruiter_shortlist(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to load shortlist: {e}")
 
-@router.get("/analytics")
-async def get_recruiter_analytics(
-    current_user: dict = Depends(get_current_user)
+@router.post("/jobs")
+async def post_recruiter_job(
+    payload: JobPostRequest,
+    current_user: dict = Depends(RoleGuard(["recruiter", "admin"]))
 ):
-    if resumes_collection is None:
-        return {"total_resumes": 0, "avg_ats": "0%", "top_skills": []}
+    if db is None:
+        raise HTTPException(status_code=503, detail="Database offline.")
 
     try:
-        resumes = list(resumes_collection.find({}))
-        total_resumes = len(resumes)
+        job_doc = {
+            "recruiter_email": current_user["email"],
+            "title": payload.title,
+            "description": payload.description,
+            "department": payload.department,
+            "required_skills": payload.required_skills,
+            "experience_years_required": payload.experience_years_required,
+            "location": payload.location,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
         
-        avg_ats = 0
-        skills_counter = {}
+        result = db["recruiter_jobs"].insert_one(job_doc)
+        job_id_str = str(result.inserted_id)
 
-        if total_resumes > 0:
-            avg_ats = int(sum(r.get("ats_score", 0) for r in resumes) / total_resumes)
-            for r in resumes:
-                for skill in r.get("skills", []):
-                    skills_counter[skill] = skills_counter.get(skill, 0) + 1
-
-        top_skills = sorted(skills_counter.items(), key=lambda x: x[1], reverse=True)[:5]
-        top_skills_list = [{"skill": s[0], "count": s[1]} for s in top_skills]
+        # Generate and save vector embedding in background/async
+        from vector_db.semantic_search import add_job_vector
+        combined_text = f"{payload.title} {payload.department} {payload.description}"
+        await add_job_vector(
+            job_id_str=job_id_str,
+            text=combined_text,
+            title=payload.title,
+            department=payload.department
+        )
 
         return {
-            "total_candidates": total_resumes,
+            "message": "Job description posted and indexed successfully.",
+            "job_id": job_id_str
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to post job: {e}")
+
+@router.get("/jobs")
+async def list_recruiter_jobs(
+    current_user: dict = Depends(RoleGuard(["recruiter", "admin"]))
+):
+    if db is None:
+        return []
+
+    try:
+        jobs_cursor = db["recruiter_jobs"].find({"recruiter_email": current_user["email"]}).sort("created_at", -1)
+        results = []
+        for doc in jobs_cursor:
+            results.append({
+                "id": str(doc["_id"]),
+                "title": doc.get("title", ""),
+                "description": doc.get("description", ""),
+                "department": doc.get("department", ""),
+                "required_skills": doc.get("required_skills", []),
+                "experience_years_required": doc.get("experience_years_required", 0),
+                "location": doc.get("location", ""),
+                "created_at": doc.get("created_at", "")
+            })
+        return results
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to list jobs: {e}")
+
+@router.get("/analytics")
+async def get_recruiter_analytics(
+    current_user: dict = Depends(RoleGuard(["recruiter", "admin"]))
+):
+    if resumes_collection is None:
+        return {"total_candidates": 0, "avg_ats": "0%", "top_skills": []}
+
+    try:
+        # 1. Pipeline for total count and average ATS score
+        stats_pipeline = [
+            {
+                "$group": {
+                    "_id": None,
+                    "total_candidates": {"$sum": 1},
+                    "avg_ats": {"$avg": "$ats_score"}
+                }
+            }
+        ]
+        
+        stats_result = list(resumes_collection.aggregate(stats_pipeline))
+        total_candidates = 0
+        avg_ats = 0
+        
+        if stats_result:
+            total_candidates = stats_result[0].get("total_candidates", 0)
+            avg_ats = int(stats_result[0].get("avg_ats", 0))
+
+        # 2. Pipeline for top skills extraction density mapping
+        skills_pipeline = [
+            {"$unwind": "$skills"},
+            {
+                "$group": {
+                    "_id": "$skills",
+                    "count": {"$sum": 1}
+                }
+            },
+            {"$sort": {"count": -1}},
+            {"$limit": 10}
+        ]
+        
+        skills_result = list(resumes_collection.aggregate(skills_pipeline))
+        top_skills_list = [{"skill": doc["_id"], "count": doc["count"]} for doc in skills_result]
+
+        return {
+            "total_candidates": total_candidates,
             "avg_ats": f"{avg_ats}%",
             "top_skills": top_skills_list
         }

@@ -1,12 +1,22 @@
 import sys
 import os
 import unittest
+import warnings
+
+# Suppress FutureWarnings and ResourceWarnings
+warnings.simplefilter("ignore", category=FutureWarning)
+warnings.simplefilter("ignore", category=ResourceWarning)
+
+# Mongo cleanup is handled centrally in tests/__init__.py
 
 backend_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'backend'))
 sys.path.insert(0, backend_path)
 
+# pyrefly: ignore [missing-import]
 from embeddings.embedding_service import EmbeddingService
+# pyrefly: ignore [missing-import]
 from embeddings.similarity_engine import SimilarityEngine
+# pyrefly: ignore [missing-import]
 from routes.interviews import MOCK_QUESTIONS
 
 class TestEmbeddingService(unittest.TestCase):
@@ -38,6 +48,7 @@ class TestSimilarityEngine(unittest.TestCase):
 
     def test_match_query_to_documents(self):
         # Clear cache first to force new word-hashing mock vector generation
+        # pyrefly: ignore [missing-import]
         from database.mongodb import db
         if db is not None:
             db["embeddings_cache"].delete_many({})
@@ -74,10 +85,12 @@ class TestEnterpriseLogic(unittest.TestCase):
 
     def test_rewriter_fallback_structure(self):
         # Verify that fallback rewrite payloads are formatted matching the expected React component state schemas
+        # pyrefly: ignore [missing-import]
         from routes.rewriter import REWRITE_FALLBACK
         self.assertIn("suggested_text", REWRITE_FALLBACK)
         self.assertIn("key_improvements", REWRITE_FALLBACK)
         self.assertTrue(isinstance(REWRITE_FALLBACK["key_improvements"], list))
+
 
 if __name__ == '__main__':
     unittest.main()

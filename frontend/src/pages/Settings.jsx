@@ -3,6 +3,7 @@ import { motion } from "framer-motion"
 import SettingsCard from "../components/SettingsCard"
 import ThemeToggle from "../components/ThemeToggle"
 import { Eye, EyeOff, Shield, Bell, LayoutGrid, Database, KeyRound, LogOut, Cpu, Briefcase } from "lucide-react"
+import { changePassword } from "../services/api"
 
 function Settings() {
   const [activeSubTab, setActiveSubTab] = useState("appearance")
@@ -19,6 +20,7 @@ function Settings() {
   const [showPass, setShowPass] = useState({ current: false, new: false, confirm: false })
   const [pwdError, setPwdError] = useState("")
   const [pwdSuccess, setPwdSuccess] = useState(false)
+  const [pwdLoading, setPwdLoading] = useState(false)
 
   // AI Configurations States
   const [aiModel, setAiModel] = useState(() => localStorage.getItem("aiModel") || "gemini-2.5-flash")
@@ -36,7 +38,7 @@ function Settings() {
   const [prefLocation, setPrefLocation] = useState(() => localStorage.getItem("preferredLocation") || "Remote, New York, San Francisco")
   const [saveCareerSuccess, setSaveCareerSuccess] = useState(false)
 
-  function handlePasswordReset(e) {
+  async function handlePasswordReset(e) {
     e.preventDefault()
     setPwdError("")
     setPwdSuccess(false)
@@ -56,15 +58,25 @@ function Settings() {
       return
     }
 
-    // Success simulation
-    setPwdSuccess(true)
-    setCurrentPassword("")
-    setNewPassword("")
-    setConfirmPassword("")
-
-    setTimeout(() => {
-      setPwdSuccess(false)
-    }, 4000)
+    setPwdLoading(true)
+    try {
+      const response = await changePassword(currentPassword, newPassword)
+      if (response.error) {
+        setPwdError(response.error)
+      } else {
+        setPwdSuccess(true)
+        setCurrentPassword("")
+        setNewPassword("")
+        setConfirmPassword("")
+        setTimeout(() => {
+          setPwdSuccess(false)
+        }, 4000)
+      }
+    } catch (err) {
+      setPwdError("An unexpected error occurred. Please try again.")
+    } finally {
+      setPwdLoading(false)
+    }
   }
 
   function handleSaveNotifications(e) {
@@ -250,13 +262,15 @@ function Settings() {
                     type={showPass.current ? "text" : "password"}
                     value={currentPassword}
                     onChange={(e) => setCurrentPassword(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 focus:border-blue-500 outline-none rounded-2xl px-5 py-3.5 pr-12 transition"
+                    disabled={pwdLoading}
+                    className="w-full bg-white/5 border border-white/10 focus:border-blue-500 outline-none rounded-2xl px-5 py-3.5 pr-12 transition disabled:opacity-50 disabled:cursor-not-allowed"
                     placeholder="Enter current password"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPass({ ...showPass, current: !showPass.current })}
-                    className="absolute right-4 top-[42px] text-gray-400 hover:text-gray-200"
+                    disabled={pwdLoading}
+                    className="absolute right-4 top-[42px] text-gray-400 hover:text-gray-200 disabled:opacity-50"
                   >
                     {showPass.current ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>
@@ -270,13 +284,15 @@ function Settings() {
                     type={showPass.new ? "text" : "password"}
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 focus:border-blue-500 outline-none rounded-2xl px-5 py-3.5 pr-12 transition"
+                    disabled={pwdLoading}
+                    className="w-full bg-white/5 border border-white/10 focus:border-blue-500 outline-none rounded-2xl px-5 py-3.5 pr-12 transition disabled:opacity-50 disabled:cursor-not-allowed"
                     placeholder="Enter new password (min. 6 chars)"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPass({ ...showPass, new: !showPass.new })}
-                    className="absolute right-4 top-[42px] text-gray-400 hover:text-gray-200"
+                    disabled={pwdLoading}
+                    className="absolute right-4 top-[42px] text-gray-400 hover:text-gray-200 disabled:opacity-50"
                   >
                     {showPass.new ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>
@@ -290,13 +306,15 @@ function Settings() {
                     type={showPass.confirm ? "text" : "password"}
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 focus:border-blue-500 outline-none rounded-2xl px-5 py-3.5 pr-12 transition"
+                    disabled={pwdLoading}
+                    className="w-full bg-white/5 border border-white/10 focus:border-blue-500 outline-none rounded-2xl px-5 py-3.5 pr-12 transition disabled:opacity-50 disabled:cursor-not-allowed"
                     placeholder="Re-type new password"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPass({ ...showPass, confirm: !showPass.confirm })}
-                    className="absolute right-4 top-[42px] text-gray-400 hover:text-gray-200"
+                    disabled={pwdLoading}
+                    className="absolute right-4 top-[42px] text-gray-400 hover:text-gray-200 disabled:opacity-50"
                   >
                     {showPass.confirm ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>
@@ -304,9 +322,12 @@ function Settings() {
 
                 <button
                   type="submit"
-                  className="px-6 py-3.5 rounded-2xl bg-blue-500 hover:bg-blue-600 transition font-semibold"
+                  disabled={pwdLoading}
+                  className={`px-6 py-3.5 rounded-2xl bg-blue-500 hover:bg-blue-600 transition font-semibold cursor-pointer ${
+                    pwdLoading ? "opacity-60 cursor-not-allowed" : ""
+                  }`}
                 >
-                  Update Password
+                  {pwdLoading ? "Updating..." : "Update Password"}
                 </button>
               </form>
             </SettingsCard>

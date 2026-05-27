@@ -4,8 +4,11 @@ import unittest
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'backend'))
 
+# pyrefly: ignore [missing-import]
 from jobs.skill_matcher import SkillMatcher
+# pyrefly: ignore [missing-import]
 from jobs.semantic_matcher import SemanticMatcher
+# pyrefly: ignore [missing-import]
 from jobs.scoring_engine import ScoringEngine
 
 class TestSkillMatcher(unittest.TestCase):

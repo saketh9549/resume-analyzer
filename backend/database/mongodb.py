@@ -2,6 +2,16 @@ import os
 from pymongo import MongoClient
 from dotenv import load_dotenv
 
+# ARCHITECTURE NOTE:
+# This module uses the synchronous pymongo.MongoClient for all database operations.
+# While the backend is built on async FastAPI, blocking pymongo calls are used here
+# for simplicity and backward compatibility. Under heavy concurrent load this can
+# cause event loop starvation. A future migration to motor.AsyncIOMotorClient across
+# all routes is recommended for production-grade scalability.
+#
+# The async motor driver in database/connection.py is used ONLY for index creation
+# during application startup and is NOT used for runtime query operations.
+
 # Load from current directory's .env if present
 load_dotenv()
 # Fall back to checking root directory if MONGO_URI is missing

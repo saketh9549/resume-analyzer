@@ -84,7 +84,7 @@ export async function getRecentUploads() {
     return await handleResponse(response)
   } catch (error) {
     console.error("Failed to fetch recent uploads:", error)
-    return []
+    return { error: error.message, data: [] }
   }
 }
 
@@ -223,7 +223,7 @@ export async function getStoredJobMatches(resumeId) {
     })
     return await handleResponse(response)
   } catch (error) {
-    console.error("Failed to fetch stored job matches:", error)
+    console.info("No stored job matches found for this resume (expected if matching hasn't been run):", error.message)
     return null
   }
 }
@@ -482,6 +482,156 @@ export async function multimodalAnalyzeResume(resumeId) {
     return await handleResponse(response)
   } catch (error) {
     console.error("Failed visual analysis:", error)
+    return { error: error.message }
+  }
+}
+
+export async function changePassword(currentPassword, newPassword) {
+  try {
+    const response = await fetch(`${BASE_URL}/auth/change-password`, {
+      method: "PUT",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({
+        current_password: currentPassword,
+        new_password: newPassword
+      })
+    })
+    return await handleResponse(response)
+  } catch (error) {
+    console.error("Failed to change password:", error)
+    return { error: error.message }
+  }
+}
+
+export async function analyzeResume(id) {
+  try {
+    const response = await fetch(`${BASE_URL}/resume/${id}/analyze`, {
+      method: "POST",
+      headers: getAuthHeaders()
+    })
+    return await handleResponse(response)
+  } catch (error) {
+    console.error("Failed to analyze resume:", error)
+    return { error: error.message }
+  }
+}
+
+export async function postRecruiterJob(jobData) {
+  try {
+    const response = await fetch(`${BASE_URL}/recruiter/jobs`, {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify(jobData)
+    })
+    return await handleResponse(response)
+  } catch (error) {
+    console.error("Failed to post recruiter job:", error)
+    return { error: error.message }
+  }
+}
+
+export async function getRecruiterJobs() {
+  try {
+    const response = await fetch(`${BASE_URL}/recruiter/jobs`, {
+      method: "GET",
+      headers: getAuthHeaders()
+    })
+    return await handleResponse(response)
+  } catch (error) {
+    console.error("Failed to list recruiter jobs:", error)
+    return []
+  }
+}
+
+export async function listResumes() {
+  try {
+    const response = await fetch(`${BASE_URL}/resume/list`, {
+      method: "GET",
+      headers: getAuthHeaders()
+    })
+    return await handleResponse(response)
+  } catch (error) {
+    console.error("Failed to list resumes:", error)
+    return []
+  }
+}
+
+export async function refreshToken(tokenPayload) {
+  try {
+    const response = await fetch(`${BASE_URL}/auth/refresh`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(tokenPayload)
+    })
+    return await handleResponse(response)
+  } catch (error) {
+    console.error("Failed to refresh token:", error)
+    return { error: error.message }
+  }
+}
+
+export async function forgotPassword(emailData) {
+  try {
+    const response = await fetch(`${BASE_URL}/auth/forgot-password`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(emailData)
+    })
+    return await handleResponse(response)
+  } catch (error) {
+    console.error("Failed to request password reset:", error)
+    return { error: error.message }
+  }
+}
+
+export async function resetPassword(resetData) {
+  try {
+    const response = await fetch(`${BASE_URL}/auth/reset-password`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(resetData)
+    })
+    return await handleResponse(response)
+  } catch (error) {
+    console.error("Failed to reset password:", error)
+    return { error: error.message }
+  }
+}
+
+export async function requestEmailVerification(emailData) {
+  try {
+    const response = await fetch(`${BASE_URL}/auth/request-email-verification`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(emailData)
+    })
+    return await handleResponse(response)
+  } catch (error) {
+    console.error("Failed to request email verification:", error)
+    return { error: error.message }
+  }
+}
+
+export async function verifyEmail(verifyData) {
+  try {
+    const response = await fetch(`${BASE_URL}/auth/verify-email`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(verifyData)
+    })
+    return await handleResponse(response)
+  } catch (error) {
+    console.error("Failed to verify email:", error)
     return { error: error.message }
   }
 }

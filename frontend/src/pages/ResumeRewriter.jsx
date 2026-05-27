@@ -2,11 +2,13 @@ import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import { getRecentUploads, rewriteResumeSection } from "../services/api"
 import { Sparkles, RefreshCw, FileText, CheckCircle2, ChevronRight, AlertCircle, Copy, Check } from "lucide-react"
+import { useToast } from "../context/ToastContext"
 
 function ResumeRewriter() {
   const [resumes, setResumes] = useState([])
   const [selectedResumeId, setSelectedResumeId] = useState("")
   const [loadingResumes, setLoadingResumes] = useState(true)
+  const { showToast } = useToast()
 
   // Form states
   const [section, setSection] = useState("summary")
@@ -23,12 +25,18 @@ function ResumeRewriter() {
     async function loadResumes() {
       try {
         const data = await getRecentUploads()
-        setResumes(data)
-        if (data && data.length > 0) {
-          setSelectedResumeId(data[0].id)
+        if (data && data.error) {
+          showToast(`Failed to load resumes: ${data.error}`, "error")
+          setResumes([])
+        } else {
+          setResumes(data || [])
+          if (data && data.length > 0) {
+            setSelectedResumeId(data[0].id)
+          }
         }
       } catch (err) {
         console.error(err)
+        showToast("An unexpected error occurred while loading resumes.", "error")
       } finally {
         setLoadingResumes(false)
       }

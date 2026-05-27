@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react"
+import { useToast } from "../context/ToastContext"
 import { getLiveJobs, getRecentUploads } from "../services/api"
 import { Briefcase, MapPin, DollarSign, ExternalLink, RefreshCw, AlertCircle, Search } from "lucide-react"
 
 function LiveJobs() {
+  const { showToast } = useToast()
   const [jobs, setJobs] = useState([])
   const [loading, setLoading] = useState(true)
   const [skillsFilter, setSkillsFilter] = useState("")
@@ -12,13 +14,24 @@ function LiveJobs() {
     async function loadData() {
       try {
         const uploads = await getRecentUploads()
-        setResumes(uploads)
+        if (uploads && uploads.error) {
+          showToast(`Failed to load resumes: ${uploads.error}`, "error")
+          setResumes([])
+        } else {
+          setResumes(uploads || [])
+        }
 
         // Load initial live jobs
         const jobData = await getLiveJobs()
-        setJobs(jobData)
+        if (jobData && jobData.error) {
+          showToast(`Failed to load live jobs: ${jobData.error}`, "error")
+          setJobs([])
+        } else {
+          setJobs(jobData || [])
+        }
       } catch (err) {
         console.error(err)
+        showToast("An unexpected error occurred while loading page data.", "error")
       } finally {
         setLoading(false)
       }
