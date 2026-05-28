@@ -1,22 +1,96 @@
-# Python
+# =========================================================================
+# ResumeAI Comprehensive .gitignore
+# =========================================================================
+
+# -------------------------------------------------------------------------
+# Python / Backend
+# -------------------------------------------------------------------------
 venv/
+env/
 __pycache__/
-*.pyc
-
-# Environment variables
-.env
-
-# Uploads
-uploads/
-
-# Node
-node_modules/
-
-# Vite
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+htmlcov/
+.coverage
+.tox/
+.nox/
+build/
+develop-eggs/
 dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+uploads/
+logs/
+temp/
+*.log
 
-# VS Code
+# -------------------------------------------------------------------------
+# Node / Frontend
+# -------------------------------------------------------------------------
+node_modules/
+dist/
+build/
+.npm/
+.yarn/
+.pnp.*
+.vite/
+
+# -------------------------------------------------------------------------
+# AI / Machine Learning Temp Files
+# -------------------------------------------------------------------------
+embeddings_cache/
+vector_db_temp/
+reports_cache/
+*.onnx
+*.pt
+*.pth
+*.h5
+.jupyter/
+.ipynb_checkpoints/
+mlruns/
+
+# -------------------------------------------------------------------------
+# Environment & Secrets
+# -------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+secrets/
+*.pem
+*.key
+*.cert
+*.crt
+
+# -------------------------------------------------------------------------
+# IDEs & OS
+# -------------------------------------------------------------------------
 .vscode/
-
-# OS files
+.idea/
+*.swp
+*.swo
 .DS_Store
+Thumbs.db
+Desktop.ini
+
+# -------------------------------------------------------------------------
+# Render / Docker
+# -------------------------------------------------------------------------
+.render/
+render_temp/
+Dockerfile.render
+.docker/
+docker-compose.override.yml
