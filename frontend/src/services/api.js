@@ -1,4 +1,4 @@
-const BASE_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000"
+const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost"
 
 const activeRequests = new Map()
 
@@ -7,22 +7,22 @@ async function dedupedFetch(url, options = {}) {
   if (method !== "GET") {
     return fetch(url, options)
   }
-  
+
   const token = localStorage.getItem("token") || ""
   const key = `${url}_${token}`
-  
+
   if (activeRequests.has(key)) {
     const cachedResponse = await activeRequests.get(key)
     return cachedResponse.clone()
   }
-  
+
   const promise = fetch(url, options).catch(err => {
     activeRequests.delete(key)
     throw err
   })
-  
+
   activeRequests.set(key, promise)
-  
+
   try {
     const response = await promise
     activeRequests.delete(key)
