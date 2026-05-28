@@ -224,7 +224,8 @@ async def get_recent_resumes(
 async def get_resume_stats(
     current_user: dict = Depends(get_current_user)
 ):
-    if resumes_collection is None:
+    from database.connection import DatabaseConnection
+    if DatabaseConnection.db is None:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Database service offline."
@@ -234,8 +235,6 @@ async def get_resume_stats(
         user_email = current_user["email"]
 
         # ── Single aggregation pipeline replaces all Python-side loops ──────
-        # Stage 1: filter by user, Stage 2: unwind skills for counting,
-        # Stage 3: group everything in one DB round-trip.
         pipeline = [
             {"$match": {"user_email": user_email}},
             {"$facet": {
@@ -261,7 +260,8 @@ async def get_resume_stats(
             }}
         ]
 
-        agg_result = list(resumes_collection.aggregate(pipeline))
+        cursor = DatabaseConnection.db["resumes"].aggregate(pipeline)
+        agg_result = await cursor.to_list(length=1)
         facet = agg_result[0] if agg_result else {}
 
         summary_docs = facet.get("summary", [])
@@ -306,7 +306,8 @@ async def get_resume_stats(
 async def get_resume_analytics(
     current_user: dict = Depends(get_current_user)
 ):
-    if resumes_collection is None:
+    from database.connection import DatabaseConnection
+    if DatabaseConnection.db is None:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Database service offline."
@@ -316,13 +317,15 @@ async def get_resume_analytics(
         "filename": 1, "ats_score": 1, "upload_date": 1, "date": 1
     }
     try:
-        cursor = resumes_collection.find(
+        cursor = DatabaseConnection.db["resumes"].find(
             {"user_email": current_user["email"]},
             _ANALYTICS_PROJECTION
         ).sort("upload_date", 1).limit(7)
+        
+        docs = await cursor.to_list(length=7)
         results = []
 
-        for doc in cursor:
+        for doc in docs:
             date_str = doc.get("upload_date") or doc.get("date") or ""
             day_label = date_str[:10]
             try:

@@ -15,21 +15,20 @@ from services.auth_service import (
     create_refresh_token,
     get_current_user
 )
-from database.mongodb import db
+from database.connection import DatabaseConnection
 from auth.security import validate_password_strength
-from database.mongodb import users_collection
 
 router = APIRouter()
 
 @router.post("/signup")
-def signup(user: UserSignup):
-    if users_collection is None:
+async def signup(user: UserSignup):
+    if DatabaseConnection.db is None:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Database service is currently offline. Please try again later."
         )
 
-    existing_user = users_collection.find_one({
+    existing_user = await DatabaseConnection.db["users"].find_one({
         "email": user.email
     })
 
@@ -49,21 +48,21 @@ def signup(user: UserSignup):
         "role": user.role or "candidate"
     }
 
-    users_collection.insert_one(user_data)
+    await DatabaseConnection.db["users"].insert_one(user_data)
 
     return {
         "message": "User created successfully"
     }
 
 @router.post("/login")
-def login(user: UserLogin):
-    if users_collection is None:
+async def login(user: UserLogin):
+    if DatabaseConnection.db is None:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Database service is currently offline. Please try again later."
         )
 
-    existing_user = users_collection.find_one({
+    existing_user = await DatabaseConnection.db["users"].find_one({
         "email": user.email
     })
 
@@ -95,13 +94,12 @@ def login(user: UserLogin):
 
     # Save to database
     from datetime import timedelta
-    if db is not None:
-        db["refresh_tokens"].insert_one({
-            "email": existing_user["email"],
-            "token": refresh_token,
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "expires_at": (datetime.now(timezone.utc) + timedelta(days=7)).isoformat()
-        })
+    await DatabaseConnection.db["refresh_tokens"].insert_one({
+        "email": existing_user["email"],
+        "token": refresh_token,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "expires_at": (datetime.now(timezone.utc) + timedelta(days=7)).isoformat()
+    })
 
     return {
         "message": "Login successful",
@@ -115,18 +113,18 @@ def login(user: UserLogin):
     }
 
 @router.put("/change-password")
-def change_password(
+async def change_password(
     payload: ChangePasswordRequest,
     current_user: dict = Depends(get_current_user)
 ):
-    if users_collection is None:
+    if DatabaseConnection.db is None:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Database offline."
         )
 
     # Fetch fresh user record
-    user_in_db = users_collection.find_one({"email": current_user["email"]})
+    user_in_db = await DatabaseConnection.db["users"].find_one({"email": current_user["email"]})
     if not user_in_db:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -147,7 +145,7 @@ def change_password(
     hashed = hash_password(payload.new_password)
 
     # Update database
-    users_collection.update_one(
+    await DatabaseConnection.db["users"].update_one(
         {"email": current_user["email"]},
         {"$set": {"password": hashed}}
     )
@@ -176,8 +174,8 @@ class VerifyEmailRequest(BaseModel):
 
 
 @router.post("/refresh")
-def refresh_token(payload: RefreshTokenRequest):
-    if db is None:
+async def refresh_token(payload: RefreshTokenRequest):
+    if DatabaseConnection.db is None:
         raise HTTPException(status_code=503, detail="Database offline.")
 
     try:
@@ -190,14 +188,14 @@ def refresh_token(payload: RefreshTokenRequest):
             
         email = token_payload.get("email")
         # Check if refresh token is in DB
-        stored = db["refresh_tokens"].find_one({"token": payload.refresh_token, "email": email})
+        stored = await DatabaseConnection.db["refresh_tokens"].find_one({"token": payload.refresh_token, "email": email})
         if not stored:
             raise HTTPException(status_code=401, detail="Refresh token has been revoked or is invalid.")
             
         # Delete old token (Rotating Refresh Token pattern)
-        db["refresh_tokens"].delete_one({"_id": stored["_id"]})
+        await DatabaseConnection.db["refresh_tokens"].delete_one({"_id": stored["_id"]})
         
-        user = users_collection.find_one({"email": email})
+        user = await DatabaseConnection.db["users"].find_one({"email": email})
         if not user:
             raise HTTPException(status_code=404, detail="User not found.")
             
@@ -206,7 +204,7 @@ def refresh_token(payload: RefreshTokenRequest):
         
         # Save new refresh token
         from datetime import timedelta
-        db["refresh_tokens"].insert_one({
+        await DatabaseConnection.db["refresh_tokens"].insert_one({
             "email": email,
             "token": new_refresh,
             "created_at": datetime.now(timezone.utc).isoformat(),
@@ -226,11 +224,11 @@ def refresh_token(payload: RefreshTokenRequest):
 
 
 @router.post("/forgot-password")
-def forgot_password(payload: ForgotPasswordRequest):
-    if users_collection is None or db is None:
+async def forgot_password(payload: ForgotPasswordRequest):
+    if DatabaseConnection.db is None:
         raise HTTPException(status_code=503, detail="Database offline.")
 
-    user = users_collection.find_one({"email": payload.email})
+    user = await DatabaseConnection.db["users"].find_one({"email": payload.email})
     if not user:
         # Prevent user enumeration attacks by returning success always
         return {"message": "If the email is registered, a reset OTP has been sent."}
@@ -240,7 +238,7 @@ def forgot_password(payload: ForgotPasswordRequest):
     otp_code = str(random.randint(100000, 999999))
     
     # Store in password_resets collection
-    db["password_resets"].update_one(
+    await DatabaseConnection.db["password_resets"].update_one(
         {"email": payload.email},
         {"$set": {
             "email": payload.email,
@@ -257,12 +255,12 @@ def forgot_password(payload: ForgotPasswordRequest):
 
 
 @router.post("/reset-password")
-def reset_password(payload: ResetPasswordRequest):
-    if users_collection is None or db is None:
+async def reset_password(payload: ResetPasswordRequest):
+    if DatabaseConnection.db is None:
         raise HTTPException(status_code=503, detail="Database offline.")
 
     # Find the OTP code in resets cache
-    record = db["password_resets"].find_one({"email": payload.email, "otp": payload.otp})
+    record = await DatabaseConnection.db["password_resets"].find_one({"email": payload.email, "otp": payload.otp})
     if not record:
         raise HTTPException(status_code=400, detail="Invalid or expired reset OTP code.")
 
@@ -273,20 +271,20 @@ def reset_password(payload: ResetPasswordRequest):
             from datetime import timedelta
             otp_time = datetime.fromisoformat(created_at)
             if datetime.now(timezone.utc) - otp_time > timedelta(minutes=10):
-                db["password_resets"].delete_one({"_id": record["_id"]})
+                await DatabaseConnection.db["password_resets"].delete_one({"_id": record["_id"]})
                 raise HTTPException(status_code=400, detail="OTP code has expired. Please request a new one.")
         except (ValueError, TypeError):
             pass  # If timestamp is malformed, allow the reset to proceed
 
     # Remove verification record
-    db["password_resets"].delete_one({"_id": record["_id"]})
+    await DatabaseConnection.db["password_resets"].delete_one({"_id": record["_id"]})
 
     # Validate password strength
     validate_password_strength(payload.new_password)
 
     # Hash and update
     hashed = hash_password(payload.new_password)
-    users_collection.update_one(
+    await DatabaseConnection.db["users"].update_one(
         {"email": payload.email},
         {"$set": {"password": hashed}}
     )
@@ -295,18 +293,18 @@ def reset_password(payload: ResetPasswordRequest):
 
 
 @router.post("/request-email-verification")
-def request_email_verification(payload: RequestVerificationRequest):
-    if users_collection is None or db is None:
+async def request_email_verification(payload: RequestVerificationRequest):
+    if DatabaseConnection.db is None:
         raise HTTPException(status_code=503, detail="Database offline.")
 
-    user = users_collection.find_one({"email": payload.email})
+    user = await DatabaseConnection.db["users"].find_one({"email": payload.email})
     if not user:
         raise HTTPException(status_code=404, detail="User account not found.")
 
     import random
     otp_code = str(random.randint(100000, 999999))
 
-    db["email_verifications"].update_one(
+    await DatabaseConnection.db["email_verifications"].update_one(
         {"email": payload.email},
         {"$set": {
             "email": payload.email,
@@ -323,11 +321,11 @@ def request_email_verification(payload: RequestVerificationRequest):
 
 
 @router.post("/verify-email")
-def verify_email(payload: VerifyEmailRequest):
-    if users_collection is None or db is None:
+async def verify_email(payload: VerifyEmailRequest):
+    if DatabaseConnection.db is None:
         raise HTTPException(status_code=503, detail="Database offline.")
 
-    record = db["email_verifications"].find_one({"email": payload.email, "otp": payload.otp})
+    record = await DatabaseConnection.db["email_verifications"].find_one({"email": payload.email, "otp": payload.otp})
     if not record:
         raise HTTPException(status_code=400, detail="Invalid verification code.")
 
@@ -338,16 +336,16 @@ def verify_email(payload: VerifyEmailRequest):
             from datetime import timedelta
             otp_time = datetime.fromisoformat(created_at)
             if datetime.now(timezone.utc) - otp_time > timedelta(minutes=10):
-                db["email_verifications"].delete_one({"_id": record["_id"]})
+                await DatabaseConnection.db["email_verifications"].delete_one({"_id": record["_id"]})
                 raise HTTPException(status_code=400, detail="Verification code has expired. Please request a new one.")
         except (ValueError, TypeError):
             pass  # If timestamp is malformed, allow verification to proceed
 
     # Delete verification record
-    db["email_verifications"].delete_one({"_id": record["_id"]})
+    await DatabaseConnection.db["email_verifications"].delete_one({"_id": record["_id"]})
 
     # Update user verification flag
-    users_collection.update_one(
+    await DatabaseConnection.db["users"].update_one(
         {"email": payload.email},
         {"$set": {"is_verified": True}}
     )
@@ -366,14 +364,13 @@ class CareerPreferencesPayload(BaseModel):
     location_preference: Optional[str] = ""
 
 @router.get("/preferences")
-def get_preferences(current_user: dict = Depends(get_current_user)):
-    if users_collection is None:
+async def get_preferences(current_user: dict = Depends(get_current_user)):
+    if DatabaseConnection.db is None:
         raise HTTPException(status_code=503, detail="Database offline.")
 
-    # Projection: only fetch the career_preferences field — avoids loading
-    # password hash, interview history, ai_feedback_history etc.
+    # Projection: only fetch the career_preferences field
     _PREF_PROJECTION = {"career_preferences": 1}
-    user = users_collection.find_one(
+    user = await DatabaseConnection.db["users"].find_one(
         {"email": current_user["email"]},
         _PREF_PROJECTION
     )
@@ -391,12 +388,12 @@ def get_preferences(current_user: dict = Depends(get_current_user)):
     })
 
 @router.post("/preferences")
-def save_preferences(payload: CareerPreferencesPayload, current_user: dict = Depends(get_current_user)):
-    if users_collection is None:
+async def save_preferences(payload: CareerPreferencesPayload, current_user: dict = Depends(get_current_user)):
+    if DatabaseConnection.db is None:
         raise HTTPException(status_code=503, detail="Database offline.")
         
     pref_dict = payload.dict()
-    users_collection.update_one(
+    await DatabaseConnection.db["users"].update_one(
         {"email": current_user["email"]},
         {
             "$set": {

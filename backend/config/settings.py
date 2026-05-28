@@ -37,7 +37,7 @@ class Settings(BaseSettings):
 
     # External Services
     REDIS_URL: Optional[str] = Field(
-        default="redis://localhost:6379/0",
+        default=None,
         description="Redis connection URL for background jobs."
     )
     
@@ -58,15 +58,16 @@ class Settings(BaseSettings):
 # Global singleton settings instance
 try:
     settings = Settings()
+    if settings.is_production and not settings.REDIS_URL:
+        settings.REDIS_URL = os.getenv("REDIS_URL") # Try to pull again just in case
 except Exception as e:
     import logging
     logging.basicConfig(level=logging.ERROR)
     logger = logging.getLogger(__name__)
-    logger.error("CRITICAL ERROR: Failed to load environment variables. Are you missing required variables like MONGO_URI?")
+    logger.error("=====================================================")
+    logger.error("CRITICAL STARTUP ERROR: CONFIGURATION VALIDATION FAILED")
+    logger.error("=====================================================")
     logger.error(str(e))
-    # If we are in production, fail fast.
-    if os.getenv("ENVIRONMENT") == "production" or os.getenv("RENDER"):
-        import sys
-        sys.exit(1)
-    else:
-        raise
+    logger.error("Please verify that all required environment variables are set in the Render Dashboard.")
+    # DO NOT call sys.exit(1) here as it abruptly kills the Render deployment without flushing logs properly.
+    raise RuntimeError(f"Startup failed due to missing configuration: {str(e)}")

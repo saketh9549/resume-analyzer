@@ -17,19 +17,19 @@ from config.settings import settings
 MONGO_URI = settings.MONGO_URI
 MONGO_DB = settings.MONGO_DB
 
+import logging
+
+logger = logging.getLogger(__name__)
+
+# Initialize MongoClient lazily. It will NOT establish a connection until the first query.
+# This prevents synchronous network blocking during FastAPI's async startup.
 try:
-    # Set a 5-second timeout for server selection so it fails quickly if offline
-    client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
-    # Trigger a connection check
-    client.admin.command('ping')
+    client = MongoClient(MONGO_URI)
     db = client[MONGO_DB]
     users_collection = db["users"]
     resumes_collection = db["resumes"]
-    print(f"MongoDB Connected Successfully to: {MONGO_URI}")
 except Exception as e:
-    print(f"CRITICAL ERROR: Failed to connect to MongoDB at {MONGO_URI}. Reason: {e}")
-    # Define fallback mock objects to prevent importing modules from crashing,
-    # but actual database operations will fail gracefully.
+    logger.error(f"CRITICAL ERROR: Failed to initialize MongoDB sync client: {e}")
     db = None
     users_collection = None
     resumes_collection = None

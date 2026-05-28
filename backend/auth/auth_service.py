@@ -1,9 +1,9 @@
 import jwt
 from fastapi import Depends, HTTPException, status
 from auth.jwt_handler import oauth2_scheme, SECRET_KEY
-from database.mongodb import users_collection
+from database.connection import DatabaseConnection
 
-def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
+async def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
     if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -17,12 +17,14 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Token payload is invalid. Email is missing."
             )
-        if users_collection is None:
+            
+        if DatabaseConnection.db is None:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="Database is currently offline. Please try again later."
             )
-        user = users_collection.find_one({"email": email})
+            
+        user = await DatabaseConnection.db["users"].find_one({"email": email})
         if user is None:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,

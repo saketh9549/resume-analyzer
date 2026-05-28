@@ -41,11 +41,14 @@ async def lifespan(app: FastAPI):
     logger.info(f"🌍 Environment: {settings.ENVIRONMENT.upper()}")
     logger.info(f"☁️ Render Mode: {'Active' if settings.RENDER else 'Inactive'}")
     logger.info("========================================")
+    # Mask MONGO_URI for logging
+    masked_uri = settings.MONGO_URI[:15] + "..." + settings.MONGO_URI[-5:] if settings.MONGO_URI else "None"
+    logger.info(f"🔑 MONGO_URI Loaded: {masked_uri}")
     
     try:
-        logger.info("⏳ Initializing MongoDB Connection...")
+        logger.info("⏳ Initializing MongoDB Async Connection...")
         await DatabaseConnection.connect_to_database()
-        logger.info("✅ MongoDB Connected successfully.")
+        logger.info("✅ MongoDB Atlas Connected successfully.")
         
         try:
             from rag.knowledge_loader import KnowledgeLoader
@@ -55,9 +58,8 @@ async def lifespan(app: FastAPI):
             logger.error(f"⚠️ Failed to seed default RAG knowledge: {se}")
     except Exception as e:
         logger.error(f"❌ CRITICAL: Failed to connect to database on startup: {e}")
-        if settings.is_production:
-            import sys
-            sys.exit(1)
+        # DO NOT call sys.exit(1). Let the app start in degraded state so /health can report it.
+        logger.error("⚠️ Application running in DEGRADED mode. Check /health/db.")
             
     yield
     await DatabaseConnection.close_database_connection()
@@ -191,17 +193,17 @@ async def health_check():
         "services": {}
     }
 
-    # Check MongoDB
+    # Check Async MongoDB
     try:
-        from database.mongodb import db
-        if db is not None:
-            db.command("ping")
-            health["services"]["mongodb"] = "online"
+        from database.connection import DatabaseConnection
+        if DatabaseConnection.db is not None:
+            await DatabaseConnection.client.admin.command("ping")
+            health["services"]["mongodb_async"] = "online"
         else:
-            health["services"]["mongodb"] = "offline"
+            health["services"]["mongodb_async"] = "offline"
             health["status"] = "degraded"
     except Exception as e:
-        health["services"]["mongodb"] = f"error: {str(e)[:60]}"
+        health["services"]["mongodb_async"] = f"error: {str(e)[:60]}"
         health["status"] = "degraded"
 
     # Check Redis
@@ -224,24 +226,17 @@ async def health_check():
 @app.get("/health/db", tags=["System"])
 async def health_check_db():
     """
-    Dedicated database connection health check.
+    Dedicated database connection health check for MongoDB Atlas.
     """
     health = {"status": "healthy", "service": "mongodb"}
     try:
-        from database.mongodb import db
-        if db is not None:
-            db.command("ping")
-            health["sync_connection"] = "online"
-        else:
-            health["sync_connection"] = "offline"
-            health["status"] = "degraded"
-            
         from database.connection import DatabaseConnection
         if DatabaseConnection.db is not None:
             await DatabaseConnection.client.admin.command("ping")
             health["async_connection"] = "online"
         else:
             health["async_connection"] = "offline"
+            health["status"] = "degraded"
             
     except Exception as e:
         health["error"] = f"error: {str(e)}"
