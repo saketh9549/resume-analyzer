@@ -5,10 +5,14 @@ CORE_RECOMMENDED_SKILLS = ["React", "Node.js", "Python", "Docker", "AWS", "SQL",
 
 def calculate_ats_score(parsed_data: Dict[str, Any], raw_text: str) -> Dict[str, Any]:
     """
-    Computes a weighted ATS score based on 7 separate dimensions.
-    Returns the total score, category scores breakdown, missing skills,
-    suggestions list, detected strengths, and optimization recommendations.
+    Computes a transparent multi-dimensional ATS score based on 10 separate NLP dimensions.
     """
+    from nlp.ats_matrix import calculate_weighted_score
+    from nlp.explainable_scoring import generate_explanations
+    from nlp.feedback_engine import FeedbackEngine
+    from nlp.action_verb_analyzer import analyze_experience_verbs
+    import re
+    
     skills = parsed_data.get("skills", [])
     education = parsed_data.get("education", [])
     experience = parsed_data.get("experience", [])
@@ -18,57 +22,42 @@ def calculate_ats_score(parsed_data: Dict[str, Any], raw_text: str) -> Dict[str,
 
     # Normalize raw text
     text_lower = raw_text.lower()
+    word_count = len(raw_text.split())
 
-    # 1. SKILLS MATCH (Weight: 25%)
-    # Ratio of matched core recommended skills
-    core_matches = [s for s in CORE_RECOMMENDED_SKILLS if s in skills]
-    missing_skills = [s for s in CORE_RECOMMENDED_SKILLS if s not in skills]
-    
-    if CORE_RECOMMENDED_SKILLS:
-        skills_match_score = int((len(core_matches) / len(CORE_RECOMMENDED_SKILLS)) * 100)
-    else:
-        skills_match_score = 100
+    # 1. SKILLS MATCH (Weight: 20%)
+    core_matches = [s for s in CORE_RECOMMENDED_SKILLS if s.lower() in [sk.lower() for sk in skills]]
+    missing_skills = [s for s in CORE_RECOMMENDED_SKILLS if s.lower() not in [sk.lower() for sk in skills]]
+    skills_match_score = int((len(core_matches) / max(1, len(CORE_RECOMMENDED_SKILLS))) * 100.0)
 
-    # 2. TECHNICAL KEYWORDS (Weight: 15%)
-    # Breadth of skills found (10 skills = 100%)
-    tech_keywords_score = min(int((len(skills) / 10) * 100), 100)
+    # 2. SEMANTIC RELEVANCE (Weight: 15%)
+    from nlp.skill_mapper import CONTEXTUAL_TECH_MAP
+    matched_cats = 0
+    for cat, list_t in CONTEXTUAL_TECH_MAP.items():
+        if any(t.lower() in text_lower for t in list_t):
+            matched_cats += 1
+    semantic_relevance_score = int((matched_cats / max(1, len(CONTEXTUAL_TECH_MAP))) * 100.0)
 
-    # 3. EXPERIENCE DEPTH (Weight: 20%)
-    # Checked based on job titles, responsibilities count, and bullet descriptions
-    experience_score = 0
+    # 3. EXPERIENCE QUALITY (Weight: 15%)
+    experience_score = 0.0
     if experience:
         job_count = len(experience)
-        # Ratio of responsibilities listed (min 3 bullet points per job)
         bullets_count = sum(len(job.get("responsibilities", [])) for job in experience)
-        
-        experience_score += min(job_count * 25, 50)  # max 50 points for job count (2 jobs)
-        experience_score += min(bullets_count * 10, 50)  # max 50 points for bullet depth
-    
-    # 4. EDUCATION STRENGTH (Weight: 10%)
-    # Evaluated on presence of degree items
-    education_score = 0
-    if education:
-        has_degree = any(edu.get("degree") for edu in education)
-        has_school = any(edu.get("institution") for edu in education)
-        if has_degree:
-            education_score += 60
-        if has_school:
-            education_score += 40
+        experience_score += min(job_count * 25.0, 50.0)
+        experience_score += min(bullets_count * 10.0, 50.0)
+    experience_quality_score = int(experience_score)
 
-    # 5. PROJECTS QUALITY (Weight: 15%)
-    # Rated on project count and description depth
-    projects_score = 0
-    if projects:
-        proj_count = len(projects)
-        has_desc = any(len(p.get("description", "")) > 30 for p in projects)
-        
-        projects_score += min(proj_count * 35, 70)  # max 70 points for count (2 projects)
-        if has_desc:
-            projects_score += 30
+    # 4. RESUME FORMATTING (Weight: 5%)
+    formatting_score = 100.0
+    if word_count < 250:
+        formatting_score -= 30
+    elif word_count > 1000:
+        formatting_score -= 25
+    bullet_lines = raw_text.count("•") + raw_text.count("-")
+    if bullet_lines > 35:
+        formatting_score -= 15
+    resume_formatting_score = int(max(0.0, formatting_score))
 
-    # 6. RESUME COMPLETENESS (Weight: 10%)
-    # Checks presence of contact details and core fields
-    completeness_score = 0
+    # 5. SECTION COMPLETENESS (Weight: 10%)
     completion_factors = {
         "email": bool(contact.get("email")),
         "phone": bool(contact.get("phone")),
@@ -76,100 +65,106 @@ def calculate_ats_score(parsed_data: Dict[str, Any], raw_text: str) -> Dict[str,
         "linkedin": bool(contact.get("linkedin")),
         "experience": bool(experience),
         "education": bool(education),
-        "skills": bool(skills)
+        "skills": bool(skills),
+        "projects": bool(projects),
+        "certifications": bool(certifications)
     }
+    fulfilled = sum(1 for present in completion_factors.values() if present)
+    section_completeness_score = int((fulfilled / len(completion_factors)) * 100.0)
+
+    # 6. ACTION VERB STRENGTH (Weight: 10%)
+    responsibilities = []
+    for exp in experience:
+        responsibilities.extend(exp.get("responsibilities", []))
+    verb_res = analyze_experience_verbs(responsibilities)
+    action_verb_strength_score = verb_res["verb_score"]
+
+    # 7. ACHIEVEMENT QUALITY (Weight: 10%)
+    ach_sentences = 0
+    total_sentences = 0
+    sentences = re.split(r'[\.\!\?]', raw_text)
+    for sent in sentences:
+        s_clean = sent.strip()
+        if not s_clean or len(s_clean.split()) < 4:
+            continue
+        total_sentences += 1
+        if re.search(r'\b(?:\d+%\s*(?:increase|reduction|growth|improvement)|[\$\d,]+\s*(?:saved|generated|revenue)|\d+\+)\b', s_clean, re.I):
+            ach_sentences += 1
+    achievement_quality_score = int((ach_sentences / max(1, total_sentences)) * 100.0 * 2.5)
+    achievement_quality_score = min(100, max(20, achievement_quality_score))
+
+    # 8. READABILITY (Weight: 5%)
+    avg_sentence_len = 15.0
+    if total_sentences > 0:
+        words_in_sents = sum(len(s.split()) for s in sentences if s.strip())
+        avg_sentence_len = words_in_sents / total_sentences
+    readability_score = 100.0
+    if avg_sentence_len < 10:
+        readability_score -= 15
+    elif avg_sentence_len > 22:
+        readability_score -= 25
+    readability_score = int(max(20.0, readability_score))
+
+    # 9. KEYWORD COVERAGE (Weight: 5%)
+    keyword_coverage_score = min(int((len(skills) / 12) * 100.0), 100)
+
+    # 10. RECRUITER RELEVANCE (Weight: 5%)
+    from jobs.scoring_engine import ScoringEngine
+    exp_years = ScoringEngine.parse_experience_years(experience)
+    recruiter_relevance_score = min(100, int((exp_years / 3.0) * 100.0))
+    if education:
+        recruiter_relevance_score = min(100, recruiter_relevance_score + 10)
+
+    category_scores = {
+        "skills_match": skills_match_score,
+        "semantic_relevance": semantic_relevance_score,
+        "experience_quality": experience_quality_score,
+        "resume_formatting": resume_formatting_score,
+        "section_completeness": section_completeness_score,
+        "action_verb_strength": action_verb_strength_score,
+        "achievement_quality": achievement_quality_score,
+        "readability": readability_score,
+        "keyword_coverage": keyword_coverage_score,
+        "recruiter_relevance": recruiter_relevance_score
+    }
+
+    final_score = calculate_weighted_score(category_scores)
     
-    fulfilled = sum(1 for factor, present in completion_factors.items() if present)
-    completeness_score = int((fulfilled / len(completion_factors)) * 100)
+    legacy_category_scores = {
+        "skills_match": skills_match_score,
+        "technical_keywords": keyword_coverage_score,
+        "experience_depth": experience_quality_score,
+        "education_strength": int(min(100.0, len(education) * 50.0)),
+        "projects_quality": int(min(100.0, len(projects) * 50.0)),
+        "resume_completeness": section_completeness_score,
+        "resume_formatting": resume_formatting_score
+    }
 
-    # 7. RESUME FORMATTING (Weight: 5%)
-    # Evaluated based on text length and structure density (ideal 300 to 800 words)
-    word_count = len(raw_text.split())
-    formatting_score = 100
-    
-    if word_count < 250:
-        # Too sparse
-        formatting_score -= 30
-    elif word_count > 1000:
-        # Too wordy / lacks spacing
-        formatting_score -= 25
-        
-    # Check for excessive bullets
-    bullet_lines = raw_text.count("•") + raw_text.count("-")
-    if bullet_lines > 35:
-        formatting_score -= 15
-        
-    formatting_score = max(formatting_score, 0)
+    ats_breakdown = generate_explanations(category_scores)
+    feedback = FeedbackEngine.generate_feedback(parsed_data, raw_text)
 
-    # WEIGHTED CALCULATION
-    final_score = int(
-        (skills_match_score * 0.25) +
-        (tech_keywords_score * 0.15) +
-        (experience_score * 0.20) +
-        (education_score * 0.10) +
-        (projects_score * 0.15) +
-        (completeness_score * 0.10) +
-        (formatting_score * 0.05)
-    )
-
-    # Ensure score is bound between 15% and 98%
-    final_score = max(min(final_score, 98), 15)
-
-    # STRENGTHS, SUGGESTIONS & OPTIMIZATION RECOMMENDATIONS
-    detected_strengths = []
-    suggestions = []
-    optimization_recommendations = []
-
-    # Strengths
-    if skills_match_score >= 80:
-        detected_strengths.append("High correlation with target industry keywords and core skillsets.")
-    if experience_score >= 80:
-        detected_strengths.append("Robust professional history showing deep layout descriptions.")
-    if projects_score >= 80:
-        detected_strengths.append("Structured personal/academic project outlines with technology lists.")
-    if formatting_score >= 90:
-        detected_strengths.append("Optimal word density and readable spacing.")
-        
-    if not detected_strengths:
-        detected_strengths.append("Clean core document schema.")
-
-    # Suggestions
-    if not completion_factors["github"]:
-        suggestions.append("Add your GitHub profile link to highlight open-source contributions.")
-    if not completion_factors["linkedin"]:
-        suggestions.append("Provide a professional LinkedIn profile URL.")
-    if "Docker" in missing_skills or "Kubernetes" in missing_skills:
-        suggestions.append("Mention containerization technologies (e.g. Docker, Kubernetes) if experienced.")
-    if "AWS" in missing_skills or "Azure" in missing_skills or "GCP" in missing_skills:
-        suggestions.append("Specify cloud architecture frameworks (e.g. AWS, Azure, Google Cloud).")
-    if word_count < 250:
-        suggestions.append("Extend your descriptions. The resume is currently too short for an ATS scan.")
-    if len(skills) < 6:
-        suggestions.append("List more programming languages, database structures, and frameworks under skills.")
-
-    # Generic optimization recommendations
-    optimization_recommendations.append("Incorporate more quantifiable achievements (e.g., 'saved $5,000 yearly', 'boosted API response speeds by 30%').")
-    optimization_recommendations.append("Keep the resume length to a clean 1-page structure if under 5 years of experience.")
-    optimization_recommendations.append("Align your project descriptions to demonstrate leadership and system architecture ownership.")
-
-    # Dedup and cap items
+    suggestions = feedback["completeness_feedback"] + feedback["action_verb_upgrades"]
     suggestions = list(dict.fromkeys(suggestions))[:4]
     if not suggestions:
         suggestions = ["Your resume matches all core checks! Tailor it further to specific job descriptions."]
+        
+    detected_strengths = []
+    if skills_match_score >= 75:
+        detected_strengths.append("High correlation with target industry keywords and core skillsets.")
+    if experience_quality_score >= 75:
+        detected_strengths.append("Robust professional history showing deep layout descriptions.")
+    if resume_formatting_score >= 85:
+        detected_strengths.append("Optimal word density and readable spacing.")
+    if not detected_strengths:
+        detected_strengths.append("Clean core document schema.")
 
     return {
         "score": final_score,
-        "category_scores": {
-            "skills_match": skills_match_score,
-            "technical_keywords": tech_keywords_score,
-            "experience_depth": experience_score,
-            "education_strength": education_score,
-            "projects_quality": projects_score,
-            "resume_completeness": completeness_score,
-            "resume_formatting": formatting_score
-        },
+        "category_scores": legacy_category_scores,
+        "ats_breakdown": ats_breakdown,
+        "feedback_history": feedback,
         "missing_skills": missing_skills,
         "suggestions": suggestions,
         "detected_strengths": detected_strengths,
-        "optimization_recommendations": optimization_recommendations
+        "optimization_recommendations": feedback["rewrite_suggestions"] + feedback["quantification_suggestions"]
     }

@@ -182,7 +182,12 @@ async def get_parsed_resume(
             "missing_skills": doc.get("missing_skills", []),
             "suggestions": doc.get("suggestions", []),
             "detected_strengths": doc.get("detected_strengths", []),
-            "optimization_recommendations": doc.get("optimization_recommendations", [])
+            "optimization_recommendations": doc.get("optimization_recommendations", []),
+            "extracted_entities": doc.get("extracted_entities", {}),
+            "ats_breakdown": doc.get("ats_breakdown", []),
+            "feedback_history": doc.get("feedback_history", {}),
+            "section_confidences": doc.get("section_confidences", {}),
+            "section_diagnostics": doc.get("section_diagnostics", {})
         }
     except Exception as e:
         if isinstance(e, HTTPException):
@@ -219,7 +224,9 @@ async def get_ats_score_breakdown(
             "ats_score": doc.get("ats_score", 0),
             "category_scores": doc.get("category_scores", {}),
             "missing_skills": doc.get("missing_skills", []),
-            "suggestions": doc.get("suggestions", [])
+            "suggestions": doc.get("suggestions", []),
+            "ats_breakdown": doc.get("ats_breakdown", []),
+            "feedback_history": doc.get("feedback_history", {})
         }
     except Exception as e:
         if isinstance(e, HTTPException):

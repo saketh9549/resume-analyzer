@@ -82,82 +82,79 @@ async def add_job_vector(job_id_str: str, text: str, title: str, department: str
 
 async def search_candidates_semantic(query: str, top_k: int = 5) -> List[Dict[str, Any]]:
     """
-    Semantic candidate matching over resumes.
+    Semantic candidate matching over resumes with advanced multi-dimensional sub-scores.
     """
     if not query or not query.strip():
         return []
 
-    # If ChromaDB is active, query ChromaDB resumes collection
-    if is_chroma_active():
-        try:
-            client = get_chroma_client()
-            collection = client.get_or_create_collection("resumes")
-            query_vector = await EmbeddingService.get_embedding(query)
-            results = collection.query(
-                query_embeddings=[query_vector],
-                n_results=top_k
-            )
-            
-            ranked = []
-            if results and results["ids"] and len(results["ids"][0]) > 0:
-                for idx, r_id in enumerate(results["ids"][0]):
-                    metadata = results["metadatas"][0][idx]
-                    # Score normalized 0-100 from distance
-                    # Chroma default is L2 squared distance, so lower is closer.
-                    dist = results["distances"][0][idx]
-                    # Convert distance to a similarity score percentage
-                    score = max(0.0, min(100.0, 100.0 - (dist * 50.0)))
-                    
-                    # Fetch extra MongoDB fields for display
-                    if resumes_collection is not None:
-                        doc = resumes_collection.find_one({"_id": ObjectId(r_id)})
-                        if doc:
-                            ranked.append({
-                                "id": r_id,
-                                "filename": doc.get("filename", ""),
-                                "user_email": doc.get("user_email", ""),
-                                "skills": doc.get("skills", []),
-                                "ats_score": doc.get("ats_score", 0),
-                                "experience": doc.get("experience", []),
-                                "education": doc.get("education", []),
-                                "similarity_score": round(score, 1)
-                            })
-                            continue
-                            
-                    ranked.append({
-                        "id": r_id,
-                        "filename": metadata.get("filename", ""),
-                        "user_email": metadata.get("user_email", ""),
-                        "similarity_score": round(score, 1)
-                    })
-                return ranked
-        except Exception as e:
-            logger.error(f"ChromaDB candidate search failed: {e}. Falling back to Mongo search.")
-
-    # MongoDB fallback: retrieve candidates and score them in-memory
     if resumes_collection is None:
         return []
-        
+
+    # Parse query to construct a mock job description
+    from nlp.semantic_match_engine import SemanticMatchEngine
+    from services.scoring_engine import CORE_RECOMMENDED_SKILLS
+    
+    query_lower = query.lower()
+    detected_skills = []
+    
+    # Simple keyword spotter from core recommended list + synonyms
+    all_techs = CORE_RECOMMENDED_SKILLS + ["FastAPI", "Flask", "Django", "Express", "Microservices", "Kubernetes", "GCP", "PostgreSQL", "MongoDB"]
+    for tech in all_techs:
+        if tech.lower() in query_lower:
+            detected_skills.append(tech)
+            
+    if not detected_skills:
+        detected_skills = [w.capitalize() for w in query.split() if len(w) > 3]
+
+    mock_job = {
+        "job_title": query,
+        "description": query,
+        "required_skills": list(set(detected_skills)),
+        "experience_years_required": 2 if "senior" in query_lower else (4 if "lead" in query_lower else 1),
+        "experience_level": "Senior" if "senior" in query_lower else ("Junior" if "junior" in query_lower else "Intermediate")
+    }
+
     cursor = resumes_collection.find({})
-    all_resumes = []
-    for r in cursor:
-        all_resumes.append({
-            "id": str(r["_id"]),
-            "filename": r.get("filename", ""),
-            "user_email": r.get("user_email", ""),
-            "skills": r.get("skills", []),
-            "ats_score": r.get("ats_score", 0),
-            "parsed_text": r.get("parsed_text", r.get("text", "")),
-            "experience": r.get("experience", []),
-            "education": r.get("education", [])
+    candidates = []
+    for doc in cursor:
+        candidates.append({
+            "id": str(doc["_id"]),
+            "filename": doc.get("filename", ""),
+            "user_email": doc.get("user_email", ""),
+            "skills": doc.get("skills", []),
+            "ats_score": doc.get("ats_score", 0),
+            "parsed_text": doc.get("parsed_text", doc.get("text", "")),
+            "experience": doc.get("experience", []),
+            "education": doc.get("education", [])
         })
+
+    ranked = []
+    for cand in candidates:
+        match_res = await SemanticMatchEngine.match_resume_to_job(
+            resume_data=cand,
+            job_details=mock_job,
+            raw_text=cand["parsed_text"]
+        )
         
-    return await SimilarityEngine.match_query_to_documents(
-        query=query,
-        documents=all_resumes,
-        text_field="parsed_text",
-        top_k=top_k
-    )
+        ranked.append({
+            "id": cand["id"],
+            "filename": cand["filename"],
+            "user_email": cand["user_email"],
+            "skills": cand["skills"],
+            "experience": cand["experience"],
+            "education": cand["education"],
+            "ats_score": cand["ats_score"],
+            "similarity_score": match_res["overall_score"],
+            "semantic_similarity_score": match_res["semantic_similarity_score"],
+            "keyword_score": match_res["keyword_score"],
+            "contextual_relevance_score": match_res["contextual_relevance_score"],
+            "recruiter_relevance_score": match_res["recruiter_relevance_score"],
+            "matching_skills": match_res["matching_skills"],
+            "missing_skills": match_res["missing_skills"]
+        })
+
+    ranked = sorted(ranked, key=lambda x: x["similarity_score"], reverse=True)
+    return ranked[:top_k]
 
 async def search_jobs_semantic(query: str, top_k: int = 5) -> List[Dict[str, Any]]:
     """

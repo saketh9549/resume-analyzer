@@ -1,7 +1,15 @@
 import React from "react"
 import { CircularProgressbar, buildStyles } from "react-circular-progressbar"
 import "react-circular-progressbar/dist/styles.css"
-import { ShieldCheck, AlertCircle, FileText, CheckCircle2 } from "lucide-react"
+import { ShieldCheck, AlertCircle, FileText, CheckCircle2, ChevronRight } from "lucide-react"
+import { 
+  ResponsiveContainer, 
+  RadarChart, 
+  PolarGrid, 
+  PolarAngleAxis, 
+  PolarRadiusAxis, 
+  Radar 
+} from "recharts"
 
 function ATSCard({ atsData }) {
   if (!atsData) return null
@@ -10,6 +18,7 @@ function ATSCard({ atsData }) {
   const categoryScores = atsData.category_scores || {}
   const missingSkills = atsData.missing_skills || []
   const suggestions = atsData.suggestions || []
+  const atsBreakdown = atsData.ats_breakdown || []
 
   // Color picker for scores
   const getScoreColor = (val) => {
@@ -20,6 +29,13 @@ function ATSCard({ atsData }) {
 
   const scoreColor = getScoreColor(score)
 
+  // Map breakdown to radar chart format
+  const radarData = atsBreakdown.map(item => ({
+    subject: item.title,
+    value: item.score,
+    fullMark: 100
+  }))
+
   return (
     <div className="bg-slate-900/60 p-6 md:p-8 rounded-3xl border border-white/5 backdrop-blur-xl space-y-8">
       {/* Card Title */}
@@ -28,14 +44,14 @@ function ATSCard({ atsData }) {
           <ShieldCheck size={22} />
         </div>
         <div>
-          <h3 className="text-xl font-bold text-gray-100">ATS Engine Diagnostics</h3>
-          <p className="text-xs text-gray-400 mt-0.5">Automated Application Tracking System validation matches</p>
+          <h3 className="text-xl font-bold text-gray-100">Advanced NLP ATS Diagnostics</h3>
+          <p className="text-xs text-gray-400 mt-0.5">Multi-dimensional semantic parser analysis and scoring matrices</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-center">
-        {/* Score Meter */}
-        <div className="md:col-span-4 flex flex-col items-center text-center space-y-4">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+        {/* Score Meter & Details */}
+        <div className="lg:col-span-4 flex flex-col items-center text-center space-y-4">
           <div className="w-36 h-36">
             <CircularProgressbar
               value={score}
@@ -49,41 +65,72 @@ function ATSCard({ atsData }) {
             />
           </div>
           <div>
-            <span className="text-xs font-black uppercase tracking-wider text-gray-500">Overall Match Rating</span>
-            <p className="text-sm font-bold mt-1" style={{ color: scoreColor }}>
-              {score >= 80 ? "Highly Optimised" : score >= 60 ? "Ready with Recommendations" : "Needs Structural Rework"}
+            <span className="text-[10px] font-black uppercase tracking-widest text-gray-500 block">Overall Match Rating</span>
+            <p className="text-sm font-black mt-1" style={{ color: scoreColor }}>
+              {score >= 85 ? "Excellent Alignment" : score >= 70 ? "Strong Fit" : score >= 50 ? "Ready with Recommendations" : "Requires Rework"}
             </p>
           </div>
         </div>
 
-        {/* Category Breakdown */}
-        <div className="md:col-span-8 space-y-4">
-          <h4 className="text-xs font-bold text-blue-400 uppercase tracking-widest block mb-1">Section Scoring Breakdown</h4>
-          {Object.entries(categoryScores).length > 0 ? (
-            <div className="space-y-3.5">
-              {Object.entries(categoryScores).map(([category, val]) => (
-                <div key={category} className="space-y-1">
-                  <div className="flex justify-between text-xs font-medium">
-                    <span className="text-gray-300 capitalize">{category.replace(/_/g, ' ')}</span>
-                    <span className="font-extrabold" style={{ color: getScoreColor(val) }}>{val}%</span>
-                  </div>
-                  <div className="w-full bg-white/5 rounded-full h-2">
-                    <div
-                      className="h-2 rounded-full transition-all duration-700"
-                      style={{ 
-                        width: `${val}%`,
-                        backgroundColor: getScoreColor(val)
-                      }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
+        {/* Radar Chart */}
+        <div className="lg:col-span-8 w-full h-[260px] flex items-center justify-center">
+          {radarData.length > 0 ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <RadarChart cx="50%" cy="50%" outerRadius="70%" data={radarData}>
+                <PolarGrid stroke="rgba(255, 255, 255, 0.05)" />
+                <PolarAngleAxis 
+                  dataKey="subject" 
+                  tick={{ fill: 'rgba(255, 255, 255, 0.6)', fontSize: 9, fontWeight: 600 }}
+                />
+                <PolarRadiusAxis 
+                  angle={30} 
+                  domain={[0, 100]} 
+                  tick={{ fill: 'rgba(255, 255, 255, 0.3)', fontSize: 8 }}
+                />
+                <Radar
+                  name="Candidate"
+                  dataKey="value"
+                  stroke="#3B82F6"
+                  fill="#3B82F6"
+                  fillOpacity={0.25}
+                />
+              </RadarChart>
+            </ResponsiveContainer>
           ) : (
-            <p className="text-gray-500 text-xs italic">No section score categories detected.</p>
+            <div className="text-gray-500 text-xs italic">Loading semantic score radar chart...</div>
           )}
         </div>
       </div>
+
+      {/* 10-Dimensional Detailed Categories */}
+      {atsBreakdown.length > 0 && (
+        <div className="space-y-4 pt-4 border-t border-white/5">
+          <h4 className="text-xs font-bold text-cyan-400 uppercase tracking-widest block">Scoring Breakdown & Matrix Insights</h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {atsBreakdown.map((item, idx) => (
+              <div key={idx} className="bg-slate-950/40 p-4 rounded-2xl border border-white/5 space-y-2.5">
+                <div className="flex justify-between items-center">
+                  <span className="font-bold text-xs text-gray-200">{item.title}</span>
+                  <span 
+                    className="text-[10px] font-black px-2 py-0.5 rounded-full"
+                    style={{ 
+                      color: getScoreColor(item.score),
+                      backgroundColor: `${getScoreColor(item.score)}15`
+                    }}
+                  >
+                    {item.score}%
+                  </span>
+                </div>
+                <p className="text-[10px] text-gray-400 leading-relaxed">{item.description}</p>
+                <div className="flex gap-1.5 items-start text-[10px] text-gray-500 border-t border-white/5 pt-2">
+                  <ChevronRight size={10} className="text-gray-400 shrink-0 mt-0.5" />
+                  <span className="italic">{item.tip}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6 border-t border-white/5">
         {/* Missing Skills */}

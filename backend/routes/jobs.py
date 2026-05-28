@@ -186,7 +186,8 @@ async def match_custom_jd(
             "projects": resume.get("projects", []),
             "experience": resume.get("experience", []),
             "certifications": resume.get("certifications", []),
-            "ats_score": resume.get("ats_score", 70)
+            "ats_score": resume.get("ats_score", 70),
+            "parsed_text": resume.get("parsed_text", "")
         }
 
         # Parse skills from JD if not explicitly provided
@@ -205,10 +206,24 @@ async def match_custom_jd(
             "experience_years_required": payload.experience_years_required,
             "industry": payload.industry,
             "salary_range": payload.salary_range,
-            "responsibilities": [line.strip() for line in payload.job_description.split("\n") if line.strip()][:5]
+            "responsibilities": [line.strip() for line in payload.job_description.split("\n") if line.strip()][:5],
+            "description": payload.job_description
         }
 
-        match_res = ScoringEngine.evaluate_job_match(resume_data, job_details)
+        # Run scoring engine for legacy metrics
+        legacy_res = ScoringEngine.evaluate_job_match(resume_data, job_details)
+        
+        # Run SemanticMatchEngine for upgraded semantic fields
+        from nlp.semantic_match_engine import SemanticMatchEngine
+        semantic_res = await SemanticMatchEngine.match_resume_to_job(
+            resume_data=resume_data,
+            job_details=job_details,
+            raw_text=resume_data.get("parsed_text", "")
+        )
+        
+        match_res = {**legacy_res, **semantic_res}
+        # align match_percentage with overall_score
+        match_res["match_percentage"] = semantic_res["overall_score"]
         return match_res
     except Exception as e:
         raise HTTPException(

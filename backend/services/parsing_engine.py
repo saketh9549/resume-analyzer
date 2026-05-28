@@ -328,24 +328,47 @@ def parse_resume(text: str) -> Dict[str, Any]:
     """
     Orchestrates parsing of text and compiles a clean, structured JSON response.
     """
-    sections = segment_sections(text)
-    contact = parse_contact_info(sections["contact"])
-    skills = parse_skills(sections["skills"])
+    from nlp.section_classifier import SectionClassifier
+    from nlp.entity_extractor import EntityExtractor
     
-    # If skills section is empty, fallback to scanning the whole text
+    seg_res = SectionClassifier.segment_resume(text)
+    sections = seg_res["sections"]
+    confidences = seg_res["confidences"]
+    diagnostics = seg_res["diagnostics"]
+    
+    contact_text = sections.get("contact", "")
+    skills_text = sections.get("skills", "")
+    education_text = sections.get("education", "")
+    experience_text = sections.get("experience", "")
+    projects_text = sections.get("projects", "")
+    certifications_text = sections.get("certifications", "")
+    
+    contact = parse_contact_info(contact_text)
+    skills = parse_skills(skills_text)
     if not skills:
         skills = parse_skills(text)
         
-    education = parse_education(sections["education"])
-    experience = parse_experience(sections["experience"])
-    projects = parse_projects(sections["projects"])
-    certifications = parse_certifications(sections["certifications"])
+    education = parse_education(education_text)
+    experience = parse_experience(experience_text)
+    projects = parse_projects(projects_text)
+    certifications = parse_certifications(certifications_text)
+    
+    # Run NER
+    extractor = EntityExtractor()
+    extracted_entities = extractor.extract_all_entities(text)
+    
+    # Merge skills from both sources to ensure maximum density
+    ner_skills = [s["value"] for s in extracted_entities.get("skills", [])]
+    merged_skills = list(set(skills + ner_skills))
     
     return {
         "contact": contact,
-        "skills": skills,
+        "skills": merged_skills,
         "education": education,
         "experience": experience,
         "projects": projects,
-        "certifications": certifications
+        "certifications": certifications,
+        "extracted_entities": extracted_entities,
+        "section_confidences": confidences,
+        "section_diagnostics": diagnostics
     }

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react"
 import { motion } from "framer-motion"
-import { getDashboardStats, getAnalyticsHistory, listResumes } from "../services/api"
+import { getDashboardStats, getAnalyticsHistory, listResumes, getParsedResume } from "../services/api"
 import { 
   BarChart, 
   Bar, 
@@ -31,6 +31,7 @@ export default function Analytics() {
   const [stats, setStats] = useState({ avg_score: "0%", skills_found: "0", job_matches: "0", total_uploads: "0" })
   const [history, setHistory] = useState([])
   const [resumes, setResumes] = useState([])
+  const [recentAtsBreakdown, setRecentAtsBreakdown] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -44,6 +45,15 @@ export default function Analytics() {
 
         const list = await listResumes()
         setResumes(list)
+
+        // Fetch most recent resume's detailed 10-dimensional ATS breakdown if available
+        if (list && list.length > 0) {
+          const recentId = list[0].id
+          const parsed = await getParsedResume(recentId)
+          if (parsed && parsed.ats_breakdown && parsed.ats_breakdown.length > 0) {
+            setRecentAtsBreakdown(parsed.ats_breakdown)
+          }
+        }
       } catch (err) {
         console.error("Failed to load analytics details:", err)
       } finally {
@@ -55,14 +65,21 @@ export default function Analytics() {
 
   // Calculate radar data from recent resumes category scores if available,
   // or fall back to high-grade standard mock data for preview
-  const radarData = [
-    { subject: "Impact", A: 85, B: 110, fullMark: 150 },
-    { subject: "Skills", A: 98, B: 130, fullMark: 150 },
-    { subject: "Experience", A: 86, B: 130, fullMark: 150 },
-    { subject: "Formatting", A: 90, B: 100, fullMark: 150 },
-    { subject: "Education", A: 70, B: 90, fullMark: 150 },
-    { subject: "Projects", A: 82, B: 100, fullMark: 150 },
-  ]
+  const radarData = recentAtsBreakdown.length > 0
+    ? recentAtsBreakdown.map(item => ({
+        subject: item.title,
+        A: item.score,
+        B: 75, // Benchmark average target
+        fullMark: 100
+      }))
+    : [
+        { subject: "Impact", A: 85, B: 110, fullMark: 150 },
+        { subject: "Skills", A: 98, B: 130, fullMark: 150 },
+        { subject: "Experience", A: 86, B: 130, fullMark: 150 },
+        { subject: "Formatting", A: 90, B: 100, fullMark: 150 },
+        { subject: "Education", A: 70, B: 90, fullMark: 150 },
+        { subject: "Projects", A: 82, B: 100, fullMark: 150 },
+      ]
 
   return (
     <div className="space-y-8 pb-12">
@@ -171,7 +188,7 @@ export default function Analytics() {
                   <RadarChart cx="50%" cy="50%" outerRadius="70%" data={radarData}>
                     <PolarGrid stroke="rgba(255,255,255,0.05)" />
                     <PolarAngleAxis dataKey="subject" stroke="#64748B" fontSize={9} />
-                    <PolarRadiusAxis angle={30} domain={[0, 150]} stroke="#64748B" fontSize={8} />
+                    <PolarRadiusAxis angle={30} domain={[0, recentAtsBreakdown.length > 0 ? 100 : 150]} stroke="#64748B" fontSize={8} />
                     <Radar name="Target Profile" dataKey="A" stroke="#3B82F6" fill="#3B82F6" fillOpacity={0.25} />
                     <Radar name="Benchmark Average" dataKey="B" stroke="#A855F7" fill="#A855F7" fillOpacity={0.1} />
                     <Tooltip 

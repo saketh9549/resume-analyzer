@@ -182,9 +182,10 @@ function JobMatching() {
     if (!matchingData || !matchingData.recommended_jobs) return []
     return matchingData.recommended_jobs.map(job => ({
       name: job.job_title,
-      "Skills Score": job.skills_score,
-      "Experience Score": job.experience_score,
-      "Project Match": job.project_score,
+      "Semantic similarity": job.semantic_similarity_score ?? job.project_score,
+      "Keyword score": job.keyword_score ?? job.skills_score,
+      "Context relevance": job.contextual_relevance_score ?? job.skills_score,
+      "Recruiter relevance": job.recruiter_relevance_score ?? job.experience_score,
       "Match %": job.match_percentage
     }))
   };
@@ -193,12 +194,10 @@ function JobMatching() {
     if (!matchingData || !matchingData.recommended_jobs || matchingData.recommended_jobs.length === 0) return []
     const topJob = matchingData.recommended_jobs[0]
     return [
-      { subject: "Skills Fit", value: topJob.skills_score },
-      { subject: "Exp Fit", value: topJob.experience_score },
-      { subject: "Projects Fit", value: topJob.project_score },
-      { subject: "Education Fit", value: topJob.education_score },
-      { subject: "Certifications", value: topJob.certs_score },
-      { subject: "ATS Base", value: topJob.project_score } // mapping project score as fallback proxy
+      { subject: "Semantic Similarity", value: topJob.semantic_similarity_score ?? topJob.project_score },
+      { subject: "Keyword Coverage", value: topJob.keyword_score ?? topJob.skills_score },
+      { subject: "Contextual Relevance", value: topJob.contextual_relevance_score ?? topJob.skills_score },
+      { subject: "Recruiter Relevance", value: topJob.recruiter_relevance_score ?? topJob.experience_score }
     ]
   }
 
@@ -425,10 +424,29 @@ function JobMatching() {
                                   </div>
                                 </div>
                               )}
+                              {/* New 4-dimensional matching sub-scores breakdown */}
+                              <div className="grid grid-cols-2 gap-2 mt-4 pt-4 border-t border-white/5 text-[10px]">
+                                <div className="flex justify-between items-center bg-slate-950/20 px-2.5 py-1.5 rounded-lg border border-white/5">
+                                  <span className="text-gray-400">Semantic Sim:</span>
+                                  <span className="font-bold text-blue-400">{job.semantic_similarity_score ?? job.project_score}%</span>
+                                </div>
+                                <div className="flex justify-between items-center bg-slate-950/20 px-2.5 py-1.5 rounded-lg border border-white/5">
+                                  <span className="text-gray-400">Keyword Fit:</span>
+                                  <span className="font-bold text-emerald-400">{job.keyword_score ?? job.skills_score}%</span>
+                                </div>
+                                <div className="flex justify-between items-center bg-slate-950/20 px-2.5 py-1.5 rounded-lg border border-white/5">
+                                  <span className="text-gray-400">Contextual:</span>
+                                  <span className="font-bold text-purple-400">{job.contextual_relevance_score ?? job.skills_score}%</span>
+                                </div>
+                                <div className="flex justify-between items-center bg-slate-950/20 px-2.5 py-1.5 rounded-lg border border-white/5">
+                                  <span className="text-gray-400">Recruiter Fit:</span>
+                                  <span className="font-bold text-yellow-400">{job.recruiter_relevance_score ?? job.experience_score}%</span>
+                                </div>
+                              </div>
                             </div>
                           </div>
-
-                          <div className="pt-6">
+                          
+                          <div className="pt-4">
                             <button
                               onClick={() => handleViewRoadmap(job)}
                               className="w-full flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-blue-500/10 hover:bg-blue-500 text-blue-400 hover:text-white transition-all font-semibold text-xs border border-blue-500/20 group-hover:border-blue-500/50 cursor-pointer"
@@ -598,6 +616,25 @@ function JobMatching() {
                         <span className="text-lg font-black text-gray-200">{customResult.education_score}%</span>
                       </div>
                     </div>
+                    {/* New 4-dimensional matching sub-scores breakdown for Custom JD */}
+                    <div className="grid grid-cols-2 gap-3 mt-4 p-4 bg-slate-950/30 rounded-2xl border border-white/5 text-xs">
+                      <div className="flex justify-between items-center bg-slate-950/40 p-2.5 rounded-xl border border-white/5">
+                        <span className="text-gray-400">Semantic Similarity:</span>
+                        <span className="font-bold text-blue-400">{customResult.semantic_similarity_score ?? customResult.project_score}%</span>
+                      </div>
+                      <div className="flex justify-between items-center bg-slate-950/40 p-2.5 rounded-xl border border-white/5">
+                        <span className="text-gray-400">Keyword Coverage:</span>
+                        <span className="font-bold text-emerald-400">{customResult.keyword_score ?? customResult.skills_score}%</span>
+                      </div>
+                      <div className="flex justify-between items-center bg-slate-950/40 p-2.5 rounded-xl border border-white/5">
+                        <span className="text-gray-400">Contextual Relevance:</span>
+                        <span className="font-bold text-purple-400">{customResult.contextual_relevance_score ?? customResult.skills_score}%</span>
+                      </div>
+                      <div className="flex justify-between items-center bg-slate-950/40 p-2.5 rounded-xl border border-white/5">
+                        <span className="text-gray-400">Recruiter Relevance:</span>
+                        <span className="font-bold text-yellow-400">{customResult.recruiter_relevance_score ?? customResult.experience_score}%</span>
+                      </div>
+                    </div>
 
                     {/* Skills found/missing */}
                     <div className="space-y-4 pt-2">
@@ -673,7 +710,7 @@ function JobMatching() {
               {/* Bar comparison chart */}
               <div className="bg-white/5 border border-white/10 p-6 rounded-3xl backdrop-blur-md space-y-4">
                 <h4 className="text-lg font-bold flex items-center gap-1.5">
-                  <BarChart3 size={18} className="text-blue-400" /> Skills vs Experience Scores comparison
+                  <BarChart3 size={18} className="text-blue-400" /> NLP Semantic Matching Metrics Breakdown
                 </h4>
                 <div className="h-80 w-full text-xs">
                   <ResponsiveContainer width="100%" height="100%">
@@ -685,9 +722,11 @@ function JobMatching() {
                         contentStyle={{ backgroundColor: "#0f172a", borderColor: "#ffffff10", color: "#f8fafc" }}
                         itemStyle={{ color: "#f8fafc" }}
                       />
-                      <Bar dataKey="Skills Score" fill="#10b981" radius={[4, 4, 0, 0]} />
-                      <Bar dataKey="Experience Score" fill="#f59e0b" radius={[4, 4, 0, 0]} />
-                      <Bar dataKey="Match %" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="Semantic similarity" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="Keyword score" fill="#10b981" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="Context relevance" fill="#a855f7" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="Recruiter relevance" fill="#eab308" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="Match %" fill="rgba(255, 255, 255, 0.2)" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>

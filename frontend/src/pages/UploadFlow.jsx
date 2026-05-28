@@ -349,11 +349,106 @@ function UploadFlow() {
                       ))}
                     </div>
                   ) : (
-                    <p className="text-gray-500 text-xs italic">No critical gaps identified.</p>
+                    <p className="text-gray-500 text-xs italic">No missing skills.</p>
                   )}
                 </div>
               </div>
             </div>
+
+            {/* SECTION 4.5: NLP Semantic Insights */}
+            {analysisResult.extracted_entities && (
+              <div className="bg-slate-900/60 p-6 rounded-3xl border border-white/5 space-y-6">
+                <h3 className="text-lg font-bold text-gray-200 flex items-center gap-2">
+                  <Sparkles size={18} className="text-cyan-400" /> 4.5. Named Entity & Semantic NLP Insights
+                </h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Entity Tags */}
+                  <div className="space-y-4">
+                    <h4 className="text-xs font-bold text-cyan-400 uppercase tracking-wider">Extracted Entities (NER)</h4>
+                    <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2 scrollbar-thin">
+                      {[
+                        { label: "Programming Languages", key: "programming_languages" },
+                        { label: "Frameworks & Libraries", key: "frameworks" },
+                        { label: "Cloud & Devops", key: "cloud_platforms" },
+                        { label: "Tools", key: "tools" },
+                        { label: "Technologies", key: "technologies" },
+                        { label: "Degrees", key: "degrees" },
+                        { label: "Universities", key: "universities" },
+                        { label: "Companies", key: "companies" },
+                        { label: "Locations", key: "locations" },
+                        { label: "Certifications", key: "certifications" },
+                        { label: "Experience Years", key: "years_of_experience" }
+                      ].map((item, idx) => {
+                        const list = analysisResult.extracted_entities[item.key] || [];
+                        if (list.length === 0) return null;
+                        return (
+                          <div key={idx} className="bg-slate-950/40 p-3.5 rounded-xl border border-white/5 space-y-1.5">
+                            <span className="text-[10px] text-gray-500 font-bold uppercase">{item.label}</span>
+                            <div className="flex flex-wrap gap-1.5">
+                              {list.map((ent, i) => (
+                                <span key={i} className="bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 px-2 py-0.5 rounded text-[10px] font-bold" title={`Confidence: ${ent.confidence * 100}%`}>
+                                  {ent.value} <span className="text-[8px] text-cyan-500/80">({Math.round(ent.confidence * 100)}%)</span>
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                  
+                  {/* Section Classifier & Action Verbs */}
+                  <div className="space-y-6">
+                    {/* Section Classifier Confidences */}
+                    {analysisResult.section_confidences && (
+                      <div className="space-y-3">
+                        <h4 className="text-xs font-bold text-purple-400 uppercase tracking-wider">Semantic Section Analysis</h4>
+                        <div className="grid grid-cols-2 gap-3 text-[10px]">
+                          {Object.entries(analysisResult.section_confidences).map(([section, confidence]) => (
+                            <div key={section} className="flex justify-between items-center bg-slate-950/30 p-2 rounded border border-white/5">
+                              <span className="text-gray-400 capitalize">{section}</span>
+                              <span className="text-purple-400 font-bold">{Math.round(confidence * 100)}% Match</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Formatting Anomalies */}
+                    {analysisResult.section_diagnostics && (
+                      <div className="space-y-3">
+                        <h4 className="text-xs font-bold text-yellow-400 uppercase tracking-wider">Structural Diagnostics</h4>
+                        <div className="p-4 bg-slate-950/30 border border-white/5 rounded-xl text-[11px] space-y-2">
+                          <div className="flex justify-between">
+                            <span className="text-gray-400">Merged Sections:</span>
+                            <span className="font-bold text-gray-200">
+                              {analysisResult.section_diagnostics.merged_sections?.length > 0 
+                                ? analysisResult.section_diagnostics.merged_sections.join(", ") 
+                                : "None Detected"}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-400">Duplicate Sections:</span>
+                            <span className="font-bold text-gray-200">
+                              {analysisResult.section_diagnostics.duplicate_sections?.length > 0 
+                                ? analysisResult.section_diagnostics.duplicate_sections.join(", ") 
+                                : "None Detected"}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-400">Unordered Sections:</span>
+                            <span className={`font-bold ${analysisResult.section_diagnostics.unordered_resume ? "text-rose-400" : "text-emerald-400"}`}>
+                              {analysisResult.section_diagnostics.unordered_resume ? "Anomaly Detected" : "Standard Order"}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* SECTION 5: Job Matches */}
             <div className="bg-slate-900/60 p-6 rounded-3xl border border-white/5 space-y-4">

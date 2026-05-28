@@ -54,6 +54,11 @@ def process_resume_parsing_task(file_path: str, user_email: str, filename: str) 
             "suggestions": scoring["suggestions"],
             "detected_strengths": scoring["detected_strengths"],
             "optimization_recommendations": scoring["optimization_recommendations"],
+            "extracted_entities": parsed_data.get("extracted_entities", {}),
+            "ats_breakdown": scoring.get("ats_breakdown", []),
+            "feedback_history": scoring.get("feedback_history", {}),
+            "section_confidences": parsed_data.get("section_confidences", {}),
+            "section_diagnostics": parsed_data.get("section_diagnostics", {}),
             "date": datetime.now(timezone.utc).isoformat()
         }
 
@@ -259,6 +264,11 @@ def run_async_analysis_task(resume_id_str: str, user_email: str) -> str:
                 "suggestions": scoring["suggestions"],
                 "detected_strengths": scoring["detected_strengths"],
                 "optimization_recommendations": scoring["optimization_recommendations"],
+                "extracted_entities": parsed_data.get("extracted_entities", {}),
+                "ats_breakdown": scoring.get("ats_breakdown", []),
+                "feedback_history": scoring.get("feedback_history", {}),
+                "section_confidences": parsed_data.get("section_confidences", {}),
+                "section_diagnostics": parsed_data.get("section_diagnostics", {})
             }}
         )
 

@@ -98,7 +98,12 @@ class UploadService:
             "missing_skills": scoring["missing_skills"],
             "suggestions": scoring["suggestions"],
             "detected_strengths": scoring["detected_strengths"],
-            "optimization_recommendations": scoring["optimization_recommendations"]
+            "optimization_recommendations": scoring["optimization_recommendations"],
+            "extracted_entities": parsed_data.get("extracted_entities", {}),
+            "ats_breakdown": scoring.get("ats_breakdown", []),
+            "feedback_history": scoring.get("feedback_history", {}),
+            "section_confidences": parsed_data.get("section_confidences", {}),
+            "section_diagnostics": parsed_data.get("section_diagnostics", {})
         }
 
         resume_id = FileMetadataService.create_metadata(

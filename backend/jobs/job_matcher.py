@@ -54,12 +54,24 @@ class JobMatcherCoordinator:
         pref_roles = [role.strip().lower() for role in preferences.get("preferred_roles", [])] if preferences else []
         pref_level = preferences.get("experience_level", "").strip().lower() if preferences else ""
 
+        from nlp.semantic_match_engine import SemanticMatchEngine
+
         for job in jobs:
             # 1. Run scoring engine
-            match_res = ScoringEngine.evaluate_job_match(resume_data, job)
+            legacy_res = ScoringEngine.evaluate_job_match(resume_data, job)
             
-            # 2. Preference boosts
-            score = float(match_res["match_percentage"])
+            # 2. Run semantic match engine
+            semantic_res = await SemanticMatchEngine.match_resume_to_job(
+                resume_data=resume_data,
+                job_details=job,
+                raw_text=resume_data.get("parsed_text", "")
+            )
+            
+            # Merge results
+            match_res = {**legacy_res, **semantic_res}
+            
+            # 3. Preference boosts
+            score = float(semantic_res["overall_score"])
             
             # Match preferred industries
             if job.get("industry", "").lower() in pref_industries or any(t.lower() in pref_industries for t in job.get("industry_tags", [])):
