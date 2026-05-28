@@ -207,6 +207,59 @@ async def health_check():
     return health
 
 
+@app.get("/health/db", tags=["System"])
+async def health_check_db():
+    """
+    Dedicated database connection health check.
+    """
+    health = {"status": "healthy", "service": "mongodb"}
+    try:
+        from database.mongodb import db
+        if db is not None:
+            db.command("ping")
+            health["sync_connection"] = "online"
+        else:
+            health["sync_connection"] = "offline"
+            health["status"] = "degraded"
+            
+        from database.connection import DatabaseConnection
+        if DatabaseConnection.db is not None:
+            await DatabaseConnection.client.admin.command("ping")
+            health["async_connection"] = "online"
+        else:
+            health["async_connection"] = "offline"
+            
+    except Exception as e:
+        health["error"] = f"error: {str(e)}"
+        health["status"] = "degraded"
+        
+    return health
+
+@app.get("/health/env", tags=["System"])
+async def health_check_env():
+    """
+    Validates that essential environment variables are set correctly in production.
+    Does not expose secrets.
+    """
+    required_vars = ["MONGO_URI", "GEMINI_API_KEY", "JWT_SECRET"]
+    env_status = {}
+    missing = []
+    
+    for var in required_vars:
+        if os.getenv(var):
+            env_status[var] = "Set"
+        else:
+            env_status[var] = "Missing"
+            missing.append(var)
+            
+    return {
+        "status": "healthy" if not missing else "degraded",
+        "missing_critical_vars": missing,
+        "environment": env_status
+    }
+
+
+
 @app.get("/metrics", tags=["System"])
 async def get_metrics():
     """

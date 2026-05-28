@@ -21,7 +21,9 @@ class DatabaseConnection:
         Establishes connection to MongoDB database and triggers index initialization.
         """
         if not uri:
-            uri = os.getenv("MONGO_URI", "mongodb://localhost:27017")
+            uri = os.getenv("MONGO_URI")
+            if not uri:
+                raise ValueError("CRITICAL ERROR: MONGO_URI environment variable is missing. Check your Render configuration.")
         if not db_name:
             db_name = os.getenv("MONGO_DB", "resume_analyzer")
 

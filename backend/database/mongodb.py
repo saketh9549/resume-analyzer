@@ -18,7 +18,9 @@ load_dotenv()
 if not os.getenv("MONGO_URI"):
     load_dotenv(dotenv_path="../.env")
 
-MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
+MONGO_URI = os.getenv("MONGO_URI")
+if not MONGO_URI:
+    raise ValueError("CRITICAL ERROR: MONGO_URI environment variable is missing. Check your Render configuration.")
 
 try:
     # Set a 5-second timeout for server selection so it fails quickly if offline
