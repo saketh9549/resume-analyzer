@@ -43,6 +43,12 @@ async def rewrite_resume_section(
             detail="Database offline."
         )
 
+    if not ObjectId.is_valid(payload.resume_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid resume ID format."
+        )
+
     # 1. Verify resume access
     resume = resumes_collection.find_one({
         "_id": ObjectId(payload.resume_id),

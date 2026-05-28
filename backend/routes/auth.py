@@ -369,11 +369,17 @@ class CareerPreferencesPayload(BaseModel):
 def get_preferences(current_user: dict = Depends(get_current_user)):
     if users_collection is None:
         raise HTTPException(status_code=503, detail="Database offline.")
-    
-    user = users_collection.find_one({"email": current_user["email"]})
+
+    # Projection: only fetch the career_preferences field — avoids loading
+    # password hash, interview history, ai_feedback_history etc.
+    _PREF_PROJECTION = {"career_preferences": 1}
+    user = users_collection.find_one(
+        {"email": current_user["email"]},
+        _PREF_PROJECTION
+    )
     if not user:
         raise HTTPException(status_code=404, detail="User not found.")
-        
+
     return user.get("career_preferences", {
         "preferred_roles": [],
         "preferred_technologies": [],

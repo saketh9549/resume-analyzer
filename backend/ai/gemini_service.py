@@ -245,3 +245,107 @@ class GeminiAIService:
             logger.error(f"Gemini skills recommendation failed: {e}")
             return RECOMMEND_FALLBACK
 
+    @staticmethod
+    async def generate_career_roadmap(
+        resume_data: dict,
+        target_role: str = "Software Engineer",
+        model_name: str = "gemini-2.5-flash"
+    ) -> dict:
+        """
+        Generates a personalized career roadmap with milestones, certifications,
+        and learning resources tailored to the resume's skill profile and target role.
+        """
+        ROADMAP_FALLBACK = {
+            "target_role": target_role,
+            "current_level": "Mid-Level Engineer",
+            "milestones": [
+                {
+                    "phase": "Phase 1 (0-3 months)",
+                    "focus": "Fill critical skill gaps and strengthen portfolio",
+                    "actions": [
+                        "Complete an online course on missing technologies",
+                        "Build a portfolio project demonstrating the target stack",
+                        "Update resume with quantified achievements"
+                    ]
+                },
+                {
+                    "phase": "Phase 2 (3-6 months)",
+                    "focus": "Gain practical experience and community recognition",
+                    "actions": [
+                        "Contribute to open source projects in the target domain",
+                        "Pursue relevant certifications",
+                        "Network with professionals in the target role"
+                    ]
+                },
+                {
+                    "phase": "Phase 3 (6-12 months)",
+                    "focus": "Apply and transition",
+                    "actions": [
+                        "Start targeted job applications",
+                        "Prepare for technical interviews",
+                        "Get referrals from professional network"
+                    ]
+                }
+            ],
+            "recommended_certifications": [
+                f"Relevant {target_role} Certification",
+                "Cloud Architecture Fundamentals"
+            ],
+            "estimated_timeline": "6-12 months"
+        }
+
+        if not api_key:
+            return ROADMAP_FALLBACK
+
+        try:
+            skills_str = ", ".join(resume_data.get("skills", []))
+            missing_str = ", ".join(resume_data.get("missing_skills", []))
+            ats = resume_data.get("ats_score", 0)
+
+            prompt = f"""
+Generate a detailed career roadmap for a professional targeting the role: **{target_role}**.
+
+Current Profile:
+- Current Skills: {skills_str or "Not specified"}
+- Missing Key Skills: {missing_str or "None identified"}
+- Current ATS Score: {ats}/100
+
+Return a JSON object with:
+{{
+  "target_role": "{target_role}",
+  "current_level": "estimated seniority level",
+  "milestones": [
+    {{
+      "phase": "Phase label (e.g. Phase 1 - 0-3 months)",
+      "focus": "Core focus area for this phase",
+      "actions": ["specific actionable step 1", "step 2", "step 3"]
+    }}
+  ],
+  "recommended_certifications": ["cert1", "cert2"],
+  "learning_resources": ["resource 1", "resource 2"],
+  "estimated_timeline": "X months",
+  "key_milestones": ["milestone 1", "milestone 2", "milestone 3"]
+}}
+
+Provide 3-4 phases covering 12 months. Be specific and actionable.
+"""
+            model = genai.GenerativeModel(
+                model_name=model_name,
+                system_instruction="You are an expert career coach specializing in tech career transitions. Return structured JSON."
+            )
+
+            loop = asyncio.get_event_loop()
+            generation_config = {"response_mime_type": "application/json"}
+
+            response = await loop.run_in_executor(
+                None,
+                partial(model.generate_content, prompt, generation_config=generation_config)
+            )
+
+            if response and response.text:
+                return parse_ai_response(response.text, ROADMAP_FALLBACK)
+
+            return ROADMAP_FALLBACK
+        except Exception as e:
+            logger.error(f"Gemini career roadmap generation failed: {e}")
+            return ROADMAP_FALLBACK

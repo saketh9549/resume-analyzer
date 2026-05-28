@@ -52,6 +52,12 @@ async def start_interview(
     if resumes_collection is None or interview_sessions_collection is None:
         raise HTTPException(status_code=503, detail="Database offline.")
 
+    if not ObjectId.is_valid(payload.resume_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid resume ID format."
+        )
+
     resume = resumes_collection.find_one({
         "_id": ObjectId(payload.resume_id),
         "user_email": current_user["email"]
@@ -119,6 +125,12 @@ async def submit_answer(
     if interview_sessions_collection is None:
         raise HTTPException(status_code=503, detail="Database offline.")
 
+    if not ObjectId.is_valid(payload.session_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid session ID format."
+        )
+
     session = interview_sessions_collection.find_one({
         "_id": ObjectId(payload.session_id),
         "user_email": current_user["email"]
@@ -182,6 +194,12 @@ async def complete_interview(
 ):
     if interview_sessions_collection is None:
         raise HTTPException(status_code=503, detail="Database offline.")
+
+    if not ObjectId.is_valid(payload.session_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid session ID format."
+        )
 
     session = interview_sessions_collection.find_one({
         "_id": ObjectId(payload.session_id),
@@ -253,17 +271,26 @@ async def get_interview_history(
     if interview_sessions_collection is None:
         return []
 
+    # Projection: only summary fields — skip the heavy per-question arrays
+    _HISTORY_PROJECTION = {
+        "job_title": 1, "difficulty": 1, "mode": 1,
+        "readiness_score": 1, "status": 1, "created_at": 1
+    }
     try:
-        cursor = interview_sessions_collection.find({"user_email": current_user["email"]}).sort("created_at", -1)
+        cursor = interview_sessions_collection.find(
+            {"user_email": current_user["email"]},
+            _HISTORY_PROJECTION
+        ).sort("created_at", -1).limit(50)
         results = []
         for doc in cursor:
             results.append({
                 "id": str(doc["_id"]),
                 "job_title": doc.get("job_title", ""),
                 "difficulty": doc.get("difficulty", "Intermediate"),
+                "mode": doc.get("mode", "Technical"),
                 "readiness_score": doc.get("readiness_score"),
                 "status": doc.get("status", "active"),
-                "created_at": doc.get("created_at")[:10] if isinstance(doc.get("created_at"), str) else str(doc.get("created_at"))[:10]
+                "created_at": doc.get("created_at", "")[:10] if isinstance(doc.get("created_at"), str) else str(doc.get("created_at", ""))[:10]
             })
         return results
     except Exception as e:

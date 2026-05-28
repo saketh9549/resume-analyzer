@@ -1,8 +1,7 @@
+import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException
-import urllib.request
-import json
 
 from services.auth_service import get_current_user
 from database.mongodb import db, resumes_collection
@@ -36,62 +35,85 @@ MOCK_LIVE_JOBS = [
     }
 ]
 
+async def _fetch_jobs_from_remotive() -> list:
+    """
+    Fetches remote jobs from Remotive API in a thread executor to avoid
+    blocking the FastAPI async event loop with synchronous urllib I/O.
+    """
+    import urllib.request
+    import json
+
+    def _blocking_request():
+        url = "https://remotive.com/api/remote-jobs?limit=50"
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=8) as response:
+            return json.loads(response.read().decode())
+
+    loop = asyncio.get_event_loop()
+    data = await loop.run_in_executor(None, _blocking_request)
+
+    jobs = []
+    for job in data.get("jobs", [])[:40]:
+        jobs.append({
+            "id": str(job.get("id")),
+            "title": job.get("title", ""),
+            "company_name": job.get("company_name", ""),
+            "category": job.get("category", ""),
+            "candidate_required_location": job.get("candidate_required_location", "Remote"),
+            "salary": job.get("salary", "N/A"),
+            "url": job.get("url", "https://remotive.com"),
+            "description": job.get("description", "")
+        })
+    return jobs
+
+
 async def fetch_and_cache_jobs() -> list:
     """
-    Fetches raw remote jobs from Remotive API and caches them in MongoDB.
-    Serves from cache if updated within last 15 minutes.
+    Fetches remote jobs from Remotive and caches in MongoDB.
+    Serves from cache when updated within the last 30 minutes.
+    Uses a thread executor for the HTTP fetch to avoid blocking the event loop.
     """
+    CACHE_TTL_MINUTES = 30
+
     if live_jobs_cache_collection is None:
         return MOCK_LIVE_JOBS
 
-    # Check cache freshness
+    # Check cache freshness first (fast DB read)
     try:
-        cache_doc = live_jobs_cache_collection.find_one({"type": "remotive_cache"})
+        cache_doc = live_jobs_cache_collection.find_one(
+            {"type": "remotive_cache"},
+            {"updated_at": 1, "jobs": 1}  # projection — skip _id overhead
+        )
         if cache_doc:
             updated_at = datetime.fromisoformat(cache_doc["updated_at"])
-            # If less than 15 minutes old, return cached data
-            if datetime.now(timezone.utc) - updated_at < timedelta(minutes=15):
+            if datetime.now(timezone.utc) - updated_at < timedelta(minutes=CACHE_TTL_MINUTES):
                 return cache_doc.get("jobs", [])
     except Exception as e:
         logger.error(f"Error checking live jobs cache: {e}")
 
-    # Fetch from Remotive API
+    # Fetch from Remotive API in thread executor (non-blocking)
     try:
-        url = "https://remotive.com/api/remote-jobs?limit=50"
-        # Set a 5-second timeout for the request to avoid blocking
-        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req, timeout=5) as response:
-            data = json.loads(response.read().decode())
-            jobs = []
-            raw_jobs = data.get("jobs", [])
-            for job in raw_jobs[:40]:  # limit to top 40 to avoid huge document sizes
-                jobs.append({
-                    "id": str(job.get("id")),
-                    "title": job.get("title", ""),
-                    "company_name": job.get("company_name", ""),
-                    "category": job.get("category", ""),
-                    "candidate_required_location": job.get("candidate_required_location", "Remote"),
-                    "salary": job.get("salary", "N/A"),
-                    "url": job.get("url", "https://remotive.com"),
-                    "description": job.get("description", "")
-                })
+        jobs = await _fetch_jobs_from_remotive()
 
-            # Update cache document
-            live_jobs_cache_collection.update_one(
-                {"type": "remotive_cache"},
-                {"$set": {
-                    "type": "remotive_cache",
-                    "jobs": jobs,
-                    "updated_at": datetime.now(timezone.utc).isoformat()
-                }},
-                upsert=True
-            )
-            return jobs
+        # Update cache document
+        live_jobs_cache_collection.update_one(
+            {"type": "remotive_cache"},
+            {"$set": {
+                "type": "remotive_cache",
+                "jobs": jobs,
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }},
+            upsert=True
+        )
+        return jobs
     except Exception as e:
         logger.error(f"Failed to fetch live Remotive jobs: {e}. Serving from stale cache.")
-        # Attempt to serve stale cache
+        # Serve stale cache on API failure
         try:
-            cache_doc = live_jobs_cache_collection.find_one({"type": "remotive_cache"})
+            cache_doc = live_jobs_cache_collection.find_one(
+                {"type": "remotive_cache"},
+                {"jobs": 1}
+            )
             if cache_doc:
                 return cache_doc.get("jobs", [])
         except Exception:
@@ -111,6 +133,10 @@ async def get_live_job_recommendations(
 
         preferences = CareerPreferenceEngine.get_preferences(current_user["email"])
         
+        if resume_id:
+            if not ObjectId.is_valid(resume_id):
+                raise HTTPException(status_code=400, detail="Invalid resume ID format.")
+
         # Load user skills
         user_skills = []
         if resume_id and resumes_collection is not None:

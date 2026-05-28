@@ -41,11 +41,24 @@ function LazyFallback() {
 }
 
 // ProtectedRoute authentication guard component
-function ProtectedRoute({ children }) {
+function ProtectedRoute({ children, allowedRoles }) {
   const token = localStorage.getItem("token")
 
   if (!token) {
     return <Navigate to="/login" replace />
+  }
+
+  if (allowedRoles) {
+    try {
+      const userRaw = localStorage.getItem("user")
+      const user = userRaw ? JSON.parse(userRaw) : null
+      const userRole = user?.role || "candidate"
+      if (!allowedRoles.includes(userRole)) {
+        return <Navigate to="/" replace />
+      }
+    } catch (e) {
+      return <Navigate to="/" replace />
+    }
   }
 
   return children
@@ -79,7 +92,14 @@ function App() {
                   <Route path="/rewriter" element={<ResumeRewriter />} />
                   <Route path="/interviews" element={<InterviewPrep />} />
                   <Route path="/live-jobs" element={<LiveJobs />} />
-                  <Route path="/recruiter" element={<RecruiterConsole />} />
+                  <Route
+                    path="/recruiter"
+                    element={
+                      <ProtectedRoute allowedRoles={["recruiter", "admin"]}>
+                        <RecruiterConsole />
+                      </ProtectedRoute>
+                    }
+                  />
                   <Route path="/analytics" element={<Analytics />} />
                   <Route path="/profile" element={<Profile />} />
                   <Route path="/settings" element={<Settings />} />

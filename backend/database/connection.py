@@ -69,6 +69,12 @@ class DatabaseConnection:
             resumes_index = await cls.db["resumes"].create_index("user_id")
             logger.info(f"Index created on resumes.user_id: {resumes_index}")
 
+            # Additional search and sort indexes for resumes
+            await cls.db["resumes"].create_index("user_email")
+            await cls.db["resumes"].create_index([("upload_date", -1)])
+            await cls.db["resumes"].create_index([("ats_score", -1)])
+            logger.info("Additional indexes compiled on resumes collection (user_email, upload_date, ats_score).")
+
             # 3. High-throughput sort index for platform ranking engines (resume_scores.ats_score descending)
             scores_index = await cls.db["resume_scores"].create_index([("ats_score", -1)])
             logger.info(f"Index created on resume_scores.ats_score: {scores_index}")
@@ -79,7 +85,8 @@ class DatabaseConnection:
 
             # 5. Fast lookup for job matches linked to specific resumes
             job_matches_index = await cls.db["job_matches"].create_index("resume_id")
-            logger.info(f"Index created on job_matches.resume_id: {job_matches_index}")
+            await cls.db["job_matches"].create_index([("semantic_score", -1)])
+            logger.info(f"Indexes created on job_matches: resume_id and semantic_score.")
 
             # 6. Enterprise indexing
             await cls.db["interview_sessions"].create_index("user_email")
@@ -90,7 +97,45 @@ class DatabaseConnection:
             await cls.db["live_jobs_cache"].create_index("type", unique=True)
             logger.info("Enterprise collections indexed successfully.")
 
-            logger.info("MongoDB indexing initialized successfully.")
+            # 7. Performance indexes for missing query patterns
+            # Recruiter jobs sorted by created_at (recruiter_email already filters)
+            await cls.db["recruiter_jobs"].create_index("recruiter_email")
+            await cls.db["recruiter_jobs"].create_index([("recruiter_email", 1), ("created_at", -1)])
+
+            # Refresh token lookup by token value (rotating token pattern)
+            try:
+                await cls.db["refresh_tokens"].delete_many({"token": {"$in": [None, ""]}})
+                duplicates = await cls.db["refresh_tokens"].aggregate([
+                    {"$group": {"_id": "$token", "count": {"$sum": 1}, "ids": {"$push": "$_id"}}},
+                    {"$match": {"count": {"$gt": 1}}}
+                ]).to_list(None)
+                for dup in duplicates:
+                    for doc_id in dup["ids"][1:]:
+                        await cls.db["refresh_tokens"].delete_one({"_id": doc_id})
+            except Exception as cleanup_err:
+                logger.warning(f"Failed to pre-clean duplicate refresh tokens: {cleanup_err}")
+
+            await cls.db["refresh_tokens"].create_index("token", unique=True)
+            await cls.db["refresh_tokens"].create_index("email")
+
+            # OTP lookup indexes for password reset and email verification
+            await cls.db["password_resets"].create_index([("email", 1), ("otp", 1)])
+            await cls.db["email_verifications"].create_index([("email", 1), ("otp", 1)])
+
+            # Interview sessions sort by created_at (user_email already indexed)
+            await cls.db["interview_sessions"].create_index([("user_email", 1), ("created_at", -1)])
+
+            # Compound index for the most common resume query pattern:
+            # find by user_email + sort by upload_date  (covers /list, /recent, /stats)
+            await cls.db["resumes"].create_index([("user_email", 1), ("upload_date", -1)])
+
+            # Career intelligence compound lookup
+            await cls.db["career_intelligence"].create_index(
+                [("resume_id", 1), ("target_role", 1), ("type", 1)]
+            )
+
+            logger.info("Performance indexes compiled successfully.")
+
         except Exception as e:
             logger.error(f"Failed to compile database collection indexes: {e}")
             raise e

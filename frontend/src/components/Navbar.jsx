@@ -146,7 +146,7 @@ function Navbar() {
                   {user?.name || "Account"}
                 </p>
                 <p className="text-gray-400 text-xs mt-0.5">
-                  Candidate
+                  {user?.role ? (user.role.charAt(0).toUpperCase() + user.role.slice(1)) : "Candidate"}
                 </p>
               </div>
             </button>

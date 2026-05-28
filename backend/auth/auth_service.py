@@ -30,6 +30,7 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
             )
         # Convert ObjectId to string to support standard JSON serialization
         user["_id"] = str(user["_id"])
+        user["id"] = user["_id"]
         return user
     except jwt.ExpiredSignatureError:
         raise HTTPException(

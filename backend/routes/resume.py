@@ -112,13 +112,21 @@ async def list_resumes(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Database offline"
         )
+    # Projection: only fetch the lightweight fields needed — exclude heavy text/embedding blobs
+    _LIST_PROJECTION = {
+        "filename": 1, "ats_score": 1, "upload_date": 1,
+        "date": 1, "category": 1, "analysis_status": 1
+    }
     try:
-        cursor = resumes_collection.find({"user_email": current_user["email"]}).sort("upload_date", -1)
+        cursor = resumes_collection.find(
+            {"user_email": current_user["email"]},
+            _LIST_PROJECTION
+        ).sort("upload_date", -1)
         results = []
         for doc in cursor:
             results.append({
                 "id": str(doc["_id"]),
-                "name": doc["filename"],
+                "name": doc.get("filename", ""),
                 "score": f"{doc.get('ats_score', 0)}%",
                 "date": (doc.get("upload_date") or doc.get("date") or "")[:10],
                 "category": doc.get("category", "Others"),
@@ -140,13 +148,20 @@ async def get_user_resumes(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Database offline"
         )
+    _LIST_PROJECTION = {
+        "filename": 1, "ats_score": 1, "upload_date": 1,
+        "date": 1, "category": 1, "analysis_status": 1
+    }
     try:
-        cursor = resumes_collection.find({"user_email": current_user["email"]}).sort("upload_date", -1)
+        cursor = resumes_collection.find(
+            {"user_email": current_user["email"]},
+            _LIST_PROJECTION
+        ).sort("upload_date", -1)
         results = []
         for doc in cursor:
             results.append({
                 "id": str(doc["_id"]),
-                "name": doc["filename"],
+                "name": doc.get("filename", ""),
                 "score": f"{doc.get('ats_score', 0)}%",
                 "date": (doc.get("upload_date") or doc.get("date") or "")[:10],
                 "category": doc.get("category", "Others"),
@@ -157,6 +172,188 @@ async def get_user_resumes(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to list resumes: {str(e)}"
+        )
+
+@router.get("/recent")
+async def get_recent_resumes(
+    current_user: dict = Depends(get_current_user)
+):
+    if resumes_collection is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database service offline."
+        )
+
+    _RECENT_PROJECTION = {
+        "filename": 1, "ats_score": 1, "upload_date": 1,
+        "date": 1, "analysis_status": 1
+    }
+    try:
+        cursor = resumes_collection.find(
+            {"user_email": current_user["email"]},
+            _RECENT_PROJECTION
+        ).sort("upload_date", -1).limit(10)
+        results = []
+        for doc in cursor:
+            score_val = doc.get("ats_score", 0)
+            try:
+                if isinstance(score_val, str):
+                    score_val = int(score_val.replace("%", "").strip())
+                else:
+                    score_val = int(score_val)
+            except:
+                score_val = 0
+
+            results.append({
+                "resume_id": str(doc["_id"]),
+                "name": doc["filename"],
+                "ats_score": score_val,
+                "id": str(doc["_id"]),
+                "score": f"{score_val}%",
+                "date": (doc.get("upload_date") or doc.get("date") or "")[:10],
+                "analysis_status": doc.get("analysis_status", "analyzed")
+            })
+        return results
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch uploads: {str(e)}"
+        )
+
+@router.get("/stats")
+async def get_resume_stats(
+    current_user: dict = Depends(get_current_user)
+):
+    if resumes_collection is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database service offline."
+        )
+
+    try:
+        user_email = current_user["email"]
+
+        # ── Single aggregation pipeline replaces all Python-side loops ──────
+        # Stage 1: filter by user, Stage 2: unwind skills for counting,
+        # Stage 3: group everything in one DB round-trip.
+        pipeline = [
+            {"$match": {"user_email": user_email}},
+            {"$facet": {
+                # Sub-pipeline A: aggregate-level stats
+                "summary": [
+                    {"$group": {
+                        "_id": None,
+                        "count": {"$sum": 1},
+                        "avg_ats": {"$avg": {"$ifNull": ["$ats_score", 0]}},
+                        "latest_date": {"$max": {"$ifNull": ["$upload_date", ""]}},
+                        "unique_skills": {"$addToSet": "$skills"}
+                    }}
+                ],
+                # Sub-pipeline B: top skills by frequency
+                "top_skills_pipe": [
+                    {"$match": {"skills": {"$exists": True, "$type": "array"}}},
+                    {"$unwind": "$skills"},
+                    {"$match": {"skills": {"$ne": None, "$ne": ""}}},
+                    {"$group": {"_id": "$skills", "count": {"$sum": 1}}},
+                    {"$sort": {"count": -1}},
+                    {"$limit": 5}
+                ]
+            }}
+        ]
+
+        agg_result = list(resumes_collection.aggregate(pipeline))
+        facet = agg_result[0] if agg_result else {}
+
+        summary_docs = facet.get("summary", [])
+        top_skills_docs = facet.get("top_skills_pipe", [])
+
+        summary = summary_docs[0] if summary_docs else {}
+        total_uploads = summary.get("count", 0)
+        avg_score = int(summary.get("avg_ats", 0))
+        latest_date_raw = summary.get("latest_date", "")
+        latest_date = latest_date_raw[:10] if latest_date_raw else "N/A"
+
+        # Flatten nested skill arrays from $addToSet of arrays
+        nested_skills = summary.get("unique_skills", [])
+        all_unique_skills = set()
+        for item in nested_skills:
+            if isinstance(item, list):
+                all_unique_skills.update(s for s in item if s)
+            elif isinstance(item, str) and item:
+                all_unique_skills.add(item)
+        skills_found_count = len(all_unique_skills)
+
+        top_skills = [doc["_id"] for doc in top_skills_docs if doc.get("_id")]
+        job_matches = max(1, int(avg_score / 10)) if total_uploads > 0 else 0
+
+        return {
+            "total_resumes": total_uploads,
+            "average_ats_score": avg_score,
+            "top_skills": top_skills,
+            "latest_upload": latest_date,
+            "avg_score": f"{avg_score}%",
+            "skills_found": str(skills_found_count),
+            "job_matches": str(job_matches),
+            "total_uploads": str(total_uploads)
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to calculate stats: {str(e)}"
+        )
+
+@router.get("/analytics")
+async def get_resume_analytics(
+    current_user: dict = Depends(get_current_user)
+):
+    if resumes_collection is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database service offline."
+        )
+
+    _ANALYTICS_PROJECTION = {
+        "filename": 1, "ats_score": 1, "upload_date": 1, "date": 1
+    }
+    try:
+        cursor = resumes_collection.find(
+            {"user_email": current_user["email"]},
+            _ANALYTICS_PROJECTION
+        ).sort("upload_date", 1).limit(7)
+        results = []
+
+        for doc in cursor:
+            date_str = doc.get("upload_date") or doc.get("date") or ""
+            day_label = date_str[:10]
+            try:
+                parsed_date = datetime.fromisoformat(date_str)
+                day_label = parsed_date.strftime("%a")
+            except:
+                pass
+            
+            score_val = doc.get("ats_score", 0)
+            try:
+                if isinstance(score_val, str):
+                    score_val = int(score_val.replace("%", "").strip())
+                else:
+                    score_val = int(score_val)
+            except:
+                score_val = 0
+
+            results.append({
+                "name": f"{day_label} ({doc['filename']})",
+                "score": score_val
+            })
+
+        if not results:
+            results = [
+                {"name": "No Data", "score": 0}
+            ]
+        return results
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch analytics: {str(e)}"
         )
 
 @router.get("/{resume_id}")
@@ -326,114 +523,7 @@ async def get_ats_score_breakdown(
             detail=f"Failed to fetch ATS breakdown: {str(e)}"
         )
 
-@router.get("/recent")
-async def get_recent_resumes(
-    current_user: dict = Depends(get_current_user)
-):
-    if resumes_collection is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Database service offline."
-        )
 
-    try:
-        # Find uploads by user email, sort by descending date
-        cursor = resumes_collection.find({"user_email": current_user["email"]}).sort("upload_date", -1).limit(10)
-        results = []
-        for doc in cursor:
-            results.append({
-                "id": str(doc["_id"]),
-                "name": doc["filename"],
-                "score": f"{doc.get('ats_score', 0)}%",
-                "date": (doc.get("upload_date") or doc.get("date") or "")[:10],  # Just YYYY-MM-DD
-                "analysis_status": doc.get("analysis_status", "analyzed")
-            })
-        return results
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to fetch uploads: {str(e)}"
-        )
-
-@router.get("/stats")
-async def get_resume_stats(
-    current_user: dict = Depends(get_current_user)
-):
-    if resumes_collection is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Database service offline."
-        )
-
-    try:
-        user_resumes = list(resumes_collection.find({"user_email": current_user["email"]}))
-        total_uploads = len(user_resumes)
-
-        if total_uploads > 0:
-            avg_score = int(sum(r.get("ats_score", 0) for r in user_resumes) / total_uploads)
-            all_skills = set()
-            for r in user_resumes:
-                all_skills.update(r.get("skills", []))
-            skills_found_count = len(all_skills)
-        else:
-            avg_score = 0
-            skills_found_count = 0
-
-        # Calculate logical matching jobs based on score (e.g. higher score = more matches)
-        job_matches = max(1, int(avg_score / 10)) if total_uploads > 0 else 0
-
-        return {
-            "avg_score": f"{avg_score}%",
-            "skills_found": str(skills_found_count),
-            "job_matches": str(job_matches),
-            "total_uploads": str(total_uploads)
-        }
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to calculate stats: {str(e)}"
-        )
-
-@router.get("/analytics")
-async def get_resume_analytics(
-    current_user: dict = Depends(get_current_user)
-):
-    if resumes_collection is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Database service offline."
-        )
-
-    try:
-        # Fetch the last 7 uploads in ascending order to plot historical progress
-        cursor = resumes_collection.find({"user_email": current_user["email"]}).sort("upload_date", 1).limit(7)
-        results = []
-
-        for doc in cursor:
-            date_str = doc.get("upload_date") or doc.get("date") or ""
-            day_label = date_str[:10]
-            try:
-                # Convert to short weekday name
-                parsed_date = datetime.fromisoformat(date_str)
-                day_label = parsed_date.strftime("%a")
-            except:
-                pass
-            results.append({
-                "name": f"{day_label} ({doc['filename']})",
-                "score": doc.get("ats_score", 0)
-            })
-
-        # Return default list if the user has no history
-        if not results:
-            results = [
-                {"name": "No Data", "score": 0}
-            ]
-        return results
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to fetch analytics: {str(e)}"
-        )
 
 @router.delete("/{resume_id}")
 async def delete_resume(
@@ -442,6 +532,12 @@ async def delete_resume(
 ):
     if resumes_collection is None:
         raise HTTPException(status_code=503, detail="Database service offline.")
+
+    if not ObjectId.is_valid(resume_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid resume ID format."
+        )
 
     try:
         doc = resumes_collection.find_one({
@@ -492,6 +588,12 @@ async def rename_resume(
     if resumes_collection is None:
         raise HTTPException(status_code=503, detail="Database service offline.")
 
+    if not ObjectId.is_valid(resume_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid resume ID format."
+        )
+
     try:
         doc = resumes_collection.find_one({
             "_id": ObjectId(resume_id),
@@ -516,6 +618,12 @@ async def reanalyze_resume(
 ):
     if resumes_collection is None:
         raise HTTPException(status_code=503, detail="Database service offline.")
+
+    if not ObjectId.is_valid(resume_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid resume ID format."
+        )
 
     try:
         doc = resumes_collection.find_one({
@@ -597,6 +705,12 @@ async def analyze_resume(
 ):
     if resumes_collection is None:
         raise HTTPException(status_code=503, detail="Database service offline.")
+
+    if not ObjectId.is_valid(resume_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid resume ID format."
+        )
 
     try:
         # 1. Retrieve the resume
@@ -797,6 +911,12 @@ async def get_analysis_results(
     if resumes_collection is None:
         raise HTTPException(status_code=503, detail="Database service offline.")
 
+    if not ObjectId.is_valid(resume_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid resume ID format."
+        )
+
     try:
         # 1. Fetch resume document
         doc = resumes_collection.find_one({
@@ -854,6 +974,12 @@ async def multimodal_analyze(
     resume_id: str,
     current_user: dict = Depends(get_current_user)
 ):
+    if not ObjectId.is_valid(resume_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid resume ID format."
+        )
+
     try:
         result = await MultimodalService.analyze_resume_visuals(resume_id, current_user["email"])
         return result
@@ -871,6 +997,11 @@ async def websocket_analysis_endpoint(websocket: WebSocket, resume_id: str):
     
     if resumes_collection is None:
         await websocket.send_json({"status": "failed", "progress": 0, "message": "Database offline."})
+        await websocket.close()
+        return
+
+    if not ObjectId.is_valid(resume_id):
+        await websocket.send_json({"status": "failed", "progress": 0, "message": "Invalid resume ID format."})
         await websocket.close()
         return
 

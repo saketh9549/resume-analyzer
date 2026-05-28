@@ -1,4 +1,5 @@
 import { Link, useLocation } from "react-router-dom"
+import { useState, useEffect } from "react"
 import {
   LayoutDashboard,
   Upload,
@@ -14,6 +15,38 @@ import {
 
 function Sidebar({ sidebarOpen, setSidebarOpen }) {
   const location = useLocation()
+  const [role, setRole] = useState(() => {
+    try {
+      const rawUser = localStorage.getItem("user")
+      const user = rawUser ? JSON.parse(rawUser) : null
+      return user?.role || "candidate"
+    } catch {
+      return "candidate"
+    }
+  })
+
+  useEffect(() => {
+    function handleStorageChange() {
+      try {
+        const rawUser = localStorage.getItem("user")
+        if (rawUser) {
+          const user = JSON.parse(rawUser)
+          setRole(user.role || "candidate")
+        } else {
+          setRole("candidate")
+        }
+      } catch (err) {
+        console.error("Failed to parse user details in sidebar:", err)
+      }
+    }
+    window.addEventListener("storage", handleStorageChange)
+    // Custom event check for same-window updates
+    window.addEventListener("userProfileUpdate", handleStorageChange)
+    return () => {
+      window.removeEventListener("storage", handleStorageChange)
+      window.removeEventListener("userProfileUpdate", handleStorageChange)
+    }
+  }, [])
 
   const navItems = [
     {
@@ -68,6 +101,13 @@ function Sidebar({ sidebarOpen, setSidebarOpen }) {
     }
   ]
 
+  const filteredNavItems = navItems.filter(item => {
+    if (item.path === "/recruiter") {
+      return role === "recruiter" || role === "admin"
+    }
+    return true
+  })
+
   return (
     <div
       className={`
@@ -108,7 +148,7 @@ function Sidebar({ sidebarOpen, setSidebarOpen }) {
 
       {/* Navigation List */}
       <ul className="space-y-3 flex-1">
-        {navItems.map((item, index) => (
+        {filteredNavItems.map((item, index) => (
           <li key={index}>
             <Link
               to={item.path}

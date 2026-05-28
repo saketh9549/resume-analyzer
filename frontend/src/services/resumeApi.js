@@ -1,5 +1,39 @@
 const BASE_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000"
 
+const activeRequests = new Map()
+
+async function dedupedFetch(url, options = {}) {
+  const method = options.method || "GET"
+  if (method !== "GET") {
+    return fetch(url, options)
+  }
+  
+  const token = localStorage.getItem("token") || ""
+  const key = `${url}_${token}`
+  
+  if (activeRequests.has(key)) {
+    const cachedResponse = await activeRequests.get(key)
+    return cachedResponse.clone()
+  }
+  
+  const promise = fetch(url, options).catch(err => {
+    activeRequests.delete(key)
+    throw err
+  })
+  
+  activeRequests.set(key, promise)
+  
+  try {
+    const response = await promise
+    activeRequests.delete(key)
+    return response.clone()
+  } catch (err) {
+    activeRequests.delete(key)
+    throw err
+  }
+}
+
+
 function getAuthHeaders(isMultipart = false) {
   const token = localStorage.getItem("token")
   const headers = {}
@@ -31,7 +65,7 @@ export async function uploadResume(file) {
   const formData = new FormData()
   formData.append("file", file)
 
-  const response = await fetch(`${BASE_URL}/resume/upload`, {
+  const response = await dedupedFetch(`${BASE_URL}/resume/upload`, {
     method: "POST",
     headers: getAuthHeaders(true),
     body: formData
@@ -40,7 +74,7 @@ export async function uploadResume(file) {
 }
 
 export async function listResumes() {
-  const response = await fetch(`${BASE_URL}/resume/list`, {
+  const response = await dedupedFetch(`${BASE_URL}/resume/list`, {
     method: "GET",
     headers: getAuthHeaders()
   })
@@ -58,7 +92,7 @@ export async function downloadResumeFile(id, filename = "resume.pdf") {
   if (token) {
     headers["Authorization"] = `Bearer ${token}`
   }
-  const response = await fetch(`${BASE_URL}/resume/download/${id}`, {
+  const response = await dedupedFetch(`${BASE_URL}/resume/download/${id}`, {
     method: "GET",
     headers: headers
   })
@@ -78,7 +112,7 @@ export async function downloadResumeFile(id, filename = "resume.pdf") {
 }
 
 export async function deleteResume(id) {
-  const response = await fetch(`${BASE_URL}/resume/${id}`, {
+  const response = await dedupedFetch(`${BASE_URL}/resume/${id}`, {
     method: "DELETE",
     headers: getAuthHeaders()
   })
@@ -86,7 +120,7 @@ export async function deleteResume(id) {
 }
 
 export async function renameResume(id, newName) {
-  const response = await fetch(`${BASE_URL}/resume/rename/${id}`, {
+  const response = await dedupedFetch(`${BASE_URL}/resume/rename/${id}`, {
     method: "PATCH",
     headers: getAuthHeaders(),
     body: JSON.stringify({ name: newName })
@@ -95,7 +129,7 @@ export async function renameResume(id, newName) {
 }
 
 export async function analyzeResume(id) {
-  const response = await fetch(`${BASE_URL}/resume/${id}/analyze`, {
+  const response = await dedupedFetch(`${BASE_URL}/resume/${id}/analyze`, {
     method: "POST",
     headers: getAuthHeaders()
   })
@@ -103,7 +137,7 @@ export async function analyzeResume(id) {
 }
 
 export async function getAnalysisResults(id) {
-  const response = await fetch(`${BASE_URL}/resume/${id}/analysis-results`, {
+  const response = await dedupedFetch(`${BASE_URL}/resume/${id}/analysis-results`, {
     method: "GET",
     headers: getAuthHeaders()
   })

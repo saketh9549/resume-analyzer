@@ -1,5 +1,39 @@
 const BASE_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000"
 
+const activeRequests = new Map()
+
+async function dedupedFetch(url, options = {}) {
+  const method = options.method || "GET"
+  if (method !== "GET") {
+    return fetch(url, options)
+  }
+  
+  const token = localStorage.getItem("token") || ""
+  const key = `${url}_${token}`
+  
+  if (activeRequests.has(key)) {
+    const cachedResponse = await activeRequests.get(key)
+    return cachedResponse.clone()
+  }
+  
+  const promise = fetch(url, options).catch(err => {
+    activeRequests.delete(key)
+    throw err
+  })
+  
+  activeRequests.set(key, promise)
+  
+  try {
+    const response = await promise
+    activeRequests.delete(key)
+    return response.clone()
+  } catch (err) {
+    activeRequests.delete(key)
+    throw err
+  }
+}
+
+
 // Helper to construct authorization headers
 function getAuthHeaders(isMultipart = false) {
   const token = localStorage.getItem("token")
@@ -31,7 +65,7 @@ async function handleResponse(response) {
 
 export async function signupUser(userData) {
   try {
-    const response = await fetch(`${BASE_URL}/auth/signup`, {
+    const response = await dedupedFetch(`${BASE_URL}/auth/signup`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
@@ -46,7 +80,7 @@ export async function signupUser(userData) {
 
 export async function loginUser(userData) {
   try {
-    const response = await fetch(`${BASE_URL}/auth/login`, {
+    const response = await dedupedFetch(`${BASE_URL}/auth/login`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
@@ -64,7 +98,7 @@ export async function uploadResume(file) {
     const formData = new FormData()
     formData.append("file", file)
 
-    const response = await fetch(`${BASE_URL}/resume/upload`, {
+    const response = await dedupedFetch(`${BASE_URL}/resume/upload`, {
       method: "POST",
       headers: getAuthHeaders(true),
       body: formData
@@ -77,7 +111,7 @@ export async function uploadResume(file) {
 
 export async function getRecentUploads() {
   try {
-    const response = await fetch(`${BASE_URL}/resume/recent`, {
+    const response = await dedupedFetch(`${BASE_URL}/resume/recent`, {
       method: "GET",
       headers: getAuthHeaders()
     })
@@ -90,7 +124,7 @@ export async function getRecentUploads() {
 
 export async function getDashboardStats() {
   try {
-    const response = await fetch(`${BASE_URL}/resume/stats`, {
+    const response = await dedupedFetch(`${BASE_URL}/resume/stats`, {
       method: "GET",
       headers: getAuthHeaders()
     })
@@ -103,7 +137,7 @@ export async function getDashboardStats() {
 
 export async function getAnalyticsHistory() {
   try {
-    const response = await fetch(`${BASE_URL}/resume/analytics`, {
+    const response = await dedupedFetch(`${BASE_URL}/resume/analytics`, {
       method: "GET",
       headers: getAuthHeaders()
     })
@@ -116,7 +150,7 @@ export async function getAnalyticsHistory() {
 
 export async function getParsedResume(id) {
   try {
-    const response = await fetch(`${BASE_URL}/resume/parse/${id}`, {
+    const response = await dedupedFetch(`${BASE_URL}/resume/parse/${id}`, {
       method: "GET",
       headers: getAuthHeaders()
     })
@@ -129,7 +163,7 @@ export async function getParsedResume(id) {
 
 export async function getATSScoreBreakdown(id) {
   try {
-    const response = await fetch(`${BASE_URL}/resume/ats/${id}`, {
+    const response = await dedupedFetch(`${BASE_URL}/resume/ats/${id}`, {
       method: "GET",
       headers: getAuthHeaders()
     })
@@ -142,7 +176,7 @@ export async function getATSScoreBreakdown(id) {
 
 export async function analyzeResumeAI(resumeId, modelName = "gemini-2.5-flash", strictness = "standard") {
   try {
-    const response = await fetch(`${BASE_URL}/ai/analyze`, {
+    const response = await dedupedFetch(`${BASE_URL}/ai/analyze`, {
       method: "POST",
       headers: getAuthHeaders(),
       body: JSON.stringify({ resume_id: resumeId, model_name: modelName, strictness })
@@ -156,7 +190,7 @@ export async function analyzeResumeAI(resumeId, modelName = "gemini-2.5-flash", 
 
 export async function getAIFeedback(resumeId) {
   try {
-    const response = await fetch(`${BASE_URL}/ai/feedback/${resumeId}`, {
+    const response = await dedupedFetch(`${BASE_URL}/ai/feedback/${resumeId}`, {
       method: "GET",
       headers: getAuthHeaders()
     })
@@ -169,7 +203,7 @@ export async function getAIFeedback(resumeId) {
 
 export async function rewriteSummary(resumeId, currentSummary = "") {
   try {
-    const response = await fetch(`${BASE_URL}/ai/rewrite-summary`, {
+    const response = await dedupedFetch(`${BASE_URL}/ai/rewrite-summary`, {
       method: "POST",
       headers: getAuthHeaders(),
       body: JSON.stringify({ resume_id: resumeId, current_summary: currentSummary })
@@ -183,7 +217,7 @@ export async function rewriteSummary(resumeId, currentSummary = "") {
 
 export async function recommendSkills(skills) {
   try {
-    const response = await fetch(`${BASE_URL}/ai/recommend-skills`, {
+    const response = await dedupedFetch(`${BASE_URL}/ai/recommend-skills`, {
       method: "POST",
       headers: getAuthHeaders(),
       body: JSON.stringify({ skills })
@@ -197,7 +231,7 @@ export async function recommendSkills(skills) {
 
 export async function matchResumeJobs(resumeId, preferences = {}) {
   try {
-    const response = await fetch(`${BASE_URL}/jobs/match`, {
+    const response = await dedupedFetch(`${BASE_URL}/jobs/match`, {
       method: "POST",
       headers: getAuthHeaders(),
       body: JSON.stringify({
@@ -217,7 +251,7 @@ export async function matchResumeJobs(resumeId, preferences = {}) {
 
 export async function getStoredJobMatches(resumeId) {
   try {
-    const response = await fetch(`${BASE_URL}/jobs/recommend/${resumeId}`, {
+    const response = await dedupedFetch(`${BASE_URL}/jobs/recommend/${resumeId}`, {
       method: "GET",
       headers: getAuthHeaders()
     })
@@ -230,7 +264,7 @@ export async function getStoredJobMatches(resumeId) {
 
 export async function matchCustomJD(resumeId, customJDData) {
   try {
-    const response = await fetch(`${BASE_URL}/jobs/match-custom`, {
+    const response = await dedupedFetch(`${BASE_URL}/jobs/match-custom`, {
       method: "POST",
       headers: getAuthHeaders(),
       body: JSON.stringify({
@@ -253,7 +287,7 @@ export async function matchCustomJD(resumeId, customJDData) {
 
 export async function getJobRoadmap(resumeId, jobTitle) {
   try {
-    const response = await fetch(`${BASE_URL}/jobs/roadmap/${resumeId}/${encodeURIComponent(jobTitle)}`, {
+    const response = await dedupedFetch(`${BASE_URL}/jobs/roadmap/${resumeId}/${encodeURIComponent(jobTitle)}`, {
       method: "GET",
       headers: getAuthHeaders()
     })
@@ -267,7 +301,7 @@ export async function getJobRoadmap(resumeId, jobTitle) {
 // Enterprise Resume Rewriter
 export async function rewriteResumeSection(resumeId, section, originalText, focusArea = "ATS Optimization") {
   try {
-    const response = await fetch(`${BASE_URL}/rewriter/rewrite`, {
+    const response = await dedupedFetch(`${BASE_URL}/rewriter/rewrite`, {
       method: "POST",
       headers: getAuthHeaders(),
       body: JSON.stringify({ resume_id: resumeId, section, original_text: originalText, focus_area: focusArea })
@@ -282,7 +316,7 @@ export async function rewriteResumeSection(resumeId, section, originalText, focu
 // Enterprise Interview Prep
 export async function startMockInterview(resumeId, jobTitle, difficulty = "Intermediate", mode = "Technical") {
   try {
-    const response = await fetch(`${BASE_URL}/interviews/start`, {
+    const response = await dedupedFetch(`${BASE_URL}/interviews/start`, {
       method: "POST",
       headers: getAuthHeaders(),
       body: JSON.stringify({ resume_id: resumeId, job_title: jobTitle, difficulty, mode })
@@ -296,7 +330,7 @@ export async function startMockInterview(resumeId, jobTitle, difficulty = "Inter
 
 export async function submitInterviewAnswer(sessionId, questionIndex, userAnswer) {
   try {
-    const response = await fetch(`${BASE_URL}/interviews/submit-answer`, {
+    const response = await dedupedFetch(`${BASE_URL}/interviews/submit-answer`, {
       method: "POST",
       headers: getAuthHeaders(),
       body: JSON.stringify({ session_id: sessionId, question_index: questionIndex, user_answer: userAnswer })
@@ -310,7 +344,7 @@ export async function submitInterviewAnswer(sessionId, questionIndex, userAnswer
 
 export async function completeMockInterview(sessionId) {
   try {
-    const response = await fetch(`${BASE_URL}/interviews/complete`, {
+    const response = await dedupedFetch(`${BASE_URL}/interviews/complete`, {
       method: "POST",
       headers: getAuthHeaders(),
       body: JSON.stringify({ session_id: sessionId })
@@ -324,7 +358,7 @@ export async function completeMockInterview(sessionId) {
 
 export async function getInterviewHistory() {
   try {
-    const response = await fetch(`${BASE_URL}/interviews/history`, {
+    const response = await dedupedFetch(`${BASE_URL}/interviews/history`, {
       method: "GET",
       headers: getAuthHeaders()
     })
@@ -338,7 +372,7 @@ export async function getInterviewHistory() {
 // Enterprise Live Jobs
 export async function getLiveJobs(skills = "", resumeId = "") {
   try {
-    const response = await fetch(`${BASE_URL}/live-jobs/recommendations?skills=${encodeURIComponent(skills)}&resume_id=${encodeURIComponent(resumeId)}`, {
+    const response = await dedupedFetch(`${BASE_URL}/live-jobs/recommendations?skills=${encodeURIComponent(skills)}&resume_id=${encodeURIComponent(resumeId)}`, {
       method: "GET",
       headers: getAuthHeaders()
     })
@@ -352,7 +386,7 @@ export async function getLiveJobs(skills = "", resumeId = "") {
 // Recruiter Dashboard
 export async function searchCandidates(query = "") {
   try {
-    const response = await fetch(`${BASE_URL}/recruiter/candidates?query=${encodeURIComponent(query)}`, {
+    const response = await dedupedFetch(`${BASE_URL}/recruiter/candidates?query=${encodeURIComponent(query)}`, {
       method: "GET",
       headers: getAuthHeaders()
     })
@@ -365,7 +399,7 @@ export async function searchCandidates(query = "") {
 
 export async function addCandidateToShortlist(resumeId, notes = "") {
   try {
-    const response = await fetch(`${BASE_URL}/recruiter/shortlist/add`, {
+    const response = await dedupedFetch(`${BASE_URL}/recruiter/shortlist/add`, {
       method: "POST",
       headers: getAuthHeaders(),
       body: JSON.stringify({ resume_id: resumeId, notes })
@@ -379,7 +413,7 @@ export async function addCandidateToShortlist(resumeId, notes = "") {
 
 export async function getRecruiterShortlist() {
   try {
-    const response = await fetch(`${BASE_URL}/recruiter/shortlist`, {
+    const response = await dedupedFetch(`${BASE_URL}/recruiter/shortlist`, {
       method: "GET",
       headers: getAuthHeaders()
     })
@@ -392,7 +426,7 @@ export async function getRecruiterShortlist() {
 
 export async function getRecruiterAnalytics() {
   try {
-    const response = await fetch(`${BASE_URL}/recruiter/analytics`, {
+    const response = await dedupedFetch(`${BASE_URL}/recruiter/analytics`, {
       method: "GET",
       headers: getAuthHeaders()
     })
@@ -405,7 +439,7 @@ export async function getRecruiterAnalytics() {
 
 export async function deleteResume(resumeId) {
   try {
-    const response = await fetch(`${BASE_URL}/resume/${resumeId}`, {
+    const response = await dedupedFetch(`${BASE_URL}/resume/${resumeId}`, {
       method: "DELETE",
       headers: getAuthHeaders()
     })
@@ -418,7 +452,7 @@ export async function deleteResume(resumeId) {
 
 export async function renameResume(resumeId, newName) {
   try {
-    const response = await fetch(`${BASE_URL}/resume/${resumeId}/rename`, {
+    const response = await dedupedFetch(`${BASE_URL}/resume/${resumeId}/rename`, {
       method: "PUT",
       headers: getAuthHeaders(),
       body: JSON.stringify({ name: newName })
@@ -437,7 +471,7 @@ export async function downloadResume(resumeId, filename = "resume.pdf") {
     if (token) {
       headers["Authorization"] = `Bearer ${token}`
     }
-    const response = await fetch(`${BASE_URL}/resume/${resumeId}/download`, {
+    const response = await dedupedFetch(`${BASE_URL}/resume/${resumeId}/download`, {
       method: "GET",
       headers: headers
     })
@@ -462,7 +496,7 @@ export async function downloadResume(resumeId, filename = "resume.pdf") {
 
 export async function reanalyzeResume(resumeId) {
   try {
-    const response = await fetch(`${BASE_URL}/resume/${resumeId}/reanalyze`, {
+    const response = await dedupedFetch(`${BASE_URL}/resume/${resumeId}/reanalyze`, {
       method: "POST",
       headers: getAuthHeaders()
     })
@@ -475,7 +509,7 @@ export async function reanalyzeResume(resumeId) {
 
 export async function multimodalAnalyzeResume(resumeId) {
   try {
-    const response = await fetch(`${BASE_URL}/resume/${resumeId}/multimodal-analyze`, {
+    const response = await dedupedFetch(`${BASE_URL}/resume/${resumeId}/multimodal-analyze`, {
       method: "POST",
       headers: getAuthHeaders()
     })
@@ -488,7 +522,7 @@ export async function multimodalAnalyzeResume(resumeId) {
 
 export async function changePassword(currentPassword, newPassword) {
   try {
-    const response = await fetch(`${BASE_URL}/auth/change-password`, {
+    const response = await dedupedFetch(`${BASE_URL}/auth/change-password`, {
       method: "PUT",
       headers: getAuthHeaders(),
       body: JSON.stringify({
@@ -505,7 +539,7 @@ export async function changePassword(currentPassword, newPassword) {
 
 export async function analyzeResume(id) {
   try {
-    const response = await fetch(`${BASE_URL}/resume/${id}/analyze`, {
+    const response = await dedupedFetch(`${BASE_URL}/resume/${id}/analyze`, {
       method: "POST",
       headers: getAuthHeaders()
     })
@@ -518,7 +552,7 @@ export async function analyzeResume(id) {
 
 export async function postRecruiterJob(jobData) {
   try {
-    const response = await fetch(`${BASE_URL}/recruiter/jobs`, {
+    const response = await dedupedFetch(`${BASE_URL}/recruiter/jobs`, {
       method: "POST",
       headers: getAuthHeaders(),
       body: JSON.stringify(jobData)
@@ -532,7 +566,7 @@ export async function postRecruiterJob(jobData) {
 
 export async function getRecruiterJobs() {
   try {
-    const response = await fetch(`${BASE_URL}/recruiter/jobs`, {
+    const response = await dedupedFetch(`${BASE_URL}/recruiter/jobs`, {
       method: "GET",
       headers: getAuthHeaders()
     })
@@ -545,7 +579,7 @@ export async function getRecruiterJobs() {
 
 export async function listResumes() {
   try {
-    const response = await fetch(`${BASE_URL}/resume/list`, {
+    const response = await dedupedFetch(`${BASE_URL}/resume/list`, {
       method: "GET",
       headers: getAuthHeaders()
     })
@@ -558,7 +592,7 @@ export async function listResumes() {
 
 export async function refreshToken(tokenPayload) {
   try {
-    const response = await fetch(`${BASE_URL}/auth/refresh`, {
+    const response = await dedupedFetch(`${BASE_URL}/auth/refresh`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
@@ -574,7 +608,7 @@ export async function refreshToken(tokenPayload) {
 
 export async function forgotPassword(emailData) {
   try {
-    const response = await fetch(`${BASE_URL}/auth/forgot-password`, {
+    const response = await dedupedFetch(`${BASE_URL}/auth/forgot-password`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
@@ -590,7 +624,7 @@ export async function forgotPassword(emailData) {
 
 export async function resetPassword(resetData) {
   try {
-    const response = await fetch(`${BASE_URL}/auth/reset-password`, {
+    const response = await dedupedFetch(`${BASE_URL}/auth/reset-password`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
@@ -606,7 +640,7 @@ export async function resetPassword(resetData) {
 
 export async function requestEmailVerification(emailData) {
   try {
-    const response = await fetch(`${BASE_URL}/auth/request-email-verification`, {
+    const response = await dedupedFetch(`${BASE_URL}/auth/request-email-verification`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
@@ -622,7 +656,7 @@ export async function requestEmailVerification(emailData) {
 
 export async function verifyEmail(verifyData) {
   try {
-    const response = await fetch(`${BASE_URL}/auth/verify-email`, {
+    const response = await dedupedFetch(`${BASE_URL}/auth/verify-email`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
@@ -636,4 +670,94 @@ export async function verifyEmail(verifyData) {
   }
 }
 
-
+// ── Career Intelligence API ─────────────────────────────────────────────────
+
+export async function getCareerRoadmap(resumeId, targetRole = "Software Engineer") {
+  try {
+    const response = await dedupedFetch(
+      `${BASE_URL}/career/roadmap/${resumeId}?target_role=${encodeURIComponent(targetRole)}`,
+      { method: "GET", headers: getAuthHeaders() }
+    )
+    return await handleResponse(response)
+  } catch (error) {
+    console.error("Failed to get career roadmap:", error)
+    return { error: error.message }
+  }
+}
+
+export async function getSkillGapAnalysis(resumeId, targetRole = "Software Engineer") {
+  try {
+    const response = await dedupedFetch(
+      `${BASE_URL}/career/skill-gap/${resumeId}?target_role=${encodeURIComponent(targetRole)}`,
+      { method: "GET", headers: getAuthHeaders() }
+    )
+    return await handleResponse(response)
+  } catch (error) {
+    console.error("Failed to get skill gap analysis:", error)
+    return { error: error.message }
+  }
+}
+
+export async function getMarketInsights(role = "Software Engineer") {
+  try {
+    const response = await dedupedFetch(
+      `${BASE_URL}/career/market-insights?role=${encodeURIComponent(role)}`,
+      { method: "GET", headers: getAuthHeaders() }
+    )
+    return await handleResponse(response)
+  } catch (error) {
+    console.error("Failed to get market insights:", error)
+    return { error: error.message }
+  }
+}
+
+export async function getGrowthTrajectory(resumeId) {
+  try {
+    const response = await dedupedFetch(
+      `${BASE_URL}/career/growth-trajectory/${resumeId}`,
+      { method: "GET", headers: getAuthHeaders() }
+    )
+    return await handleResponse(response)
+  } catch (error) {
+    console.error("Failed to get growth trajectory:", error)
+    return { error: error.message }
+  }
+}
+
+export async function getCareerIntelligenceSummary(resumeId, targetRole = "Software Engineer") {
+  try {
+    const response = await dedupedFetch(
+      `${BASE_URL}/career/intelligence/summary/${resumeId}?target_role=${encodeURIComponent(targetRole)}`,
+      { method: "GET", headers: getAuthHeaders() }
+    )
+    return await handleResponse(response)
+  } catch (error) {
+    console.error("Failed to get career intelligence summary:", error)
+    return { error: error.message }
+  }
+}
+
+// ── System Health API ────────────────────────────────────────────────────────
+
+export async function getSystemHealth() {
+  try {
+    const response = await fetch(`${BASE_URL}/health`)
+    return await handleResponse(response)
+  } catch (error) {
+    console.error("Health check failed:", error)
+    return { status: "unreachable", error: error.message }
+  }
+}
+
+export async function getSystemMetrics() {
+  try {
+    const response = await dedupedFetch(`${BASE_URL}/metrics`, {
+      method: "GET",
+      headers: getAuthHeaders()
+    })
+    return await handleResponse(response)
+  } catch (error) {
+    console.error("Metrics fetch failed:", error)
+    return { error: error.message }
+  }
+}

@@ -45,6 +45,12 @@ async def match_resume_jobs(
             detail="Database offline. Cannot execute job matching."
         )
 
+    if not ObjectId.is_valid(payload.resume_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid resume ID format."
+        )
+
     try:
         # Retrieve the resume document
         resume = resumes_collection.find_one({
@@ -123,7 +129,24 @@ async def get_recommended_jobs(
             detail="Database offline."
         )
 
+    if not ObjectId.is_valid(resume_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid resume ID format."
+        )
+
     try:
+        # Verify access credentials and resume existence first
+        resume = resumes_collection.find_one({
+            "_id": ObjectId(resume_id),
+            "user_email": current_user["email"]
+        })
+        if not resume:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Resume record not found."
+            )
+
         # Retrieve stored matching details
         doc = job_matches_collection.find_one({"resume_id": ObjectId(resume_id)})
         if not doc:
@@ -131,24 +154,31 @@ async def get_recommended_jobs(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Recommended jobs not found. Trigger /jobs/match first."
             )
+
+        recommended_jobs = doc.get("recommended_jobs", [])
+        career_guidance = doc.get("career_guidance", {})
         
-        # Verify access credentials
-        resume = resumes_collection.find_one({
-            "_id": ObjectId(resume_id),
-            "user_email": current_user["email"]
-        })
-        if not resume:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Access to this resume evaluation is denied."
-            )
+        # Calculate semantic score fallback
+        semantic_score = 82
+        if "overall_score" in career_guidance:
+            semantic_score = career_guidance["overall_score"]
+        elif "semantic_alignment_score" in career_guidance:
+            semantic_score = career_guidance["semantic_alignment_score"]
+        elif recommended_jobs:
+            avg_matches = sum(j.get("match_percentage", 0) for j in recommended_jobs) / len(recommended_jobs)
+            semantic_score = int(avg_matches)
+
+        recommended_roles = [j.get("job_title") for j in recommended_jobs if j.get("job_title")]
 
         return {
             "id": str(doc["_id"]),
             "resume_id": str(doc["resume_id"]),
-            "recommended_jobs": doc.get("recommended_jobs", []),
-            "career_guidance": doc.get("career_guidance", {}),
-            "generated_at": doc["generated_at"]
+            "recommended_jobs": recommended_jobs,
+            "career_guidance": career_guidance,
+            "generated_at": doc["generated_at"],
+            "matches": recommended_jobs,
+            "semantic_score": semantic_score,
+            "recommended_roles": recommended_roles
         }
     except Exception as e:
         if isinstance(e, HTTPException):
@@ -167,6 +197,12 @@ async def match_custom_jd(
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Database offline."
+        )
+
+    if not ObjectId.is_valid(payload.resume_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid resume ID format."
         )
 
     try:
@@ -241,6 +277,12 @@ async def get_role_roadmap(
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Database service offline."
+        )
+
+    if not ObjectId.is_valid(resume_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid resume ID format."
         )
 
     try:
