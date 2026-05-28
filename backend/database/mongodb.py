@@ -12,22 +12,17 @@ from dotenv import load_dotenv
 # The async motor driver in database/connection.py is used ONLY for index creation
 # during application startup and is NOT used for runtime query operations.
 
-# Load from current directory's .env if present
-load_dotenv()
-# Fall back to checking root directory if MONGO_URI is missing
-if not os.getenv("MONGO_URI"):
-    load_dotenv(dotenv_path="../.env")
+from config.settings import settings
 
-MONGO_URI = os.getenv("MONGO_URI")
-if not MONGO_URI:
-    raise ValueError("CRITICAL ERROR: MONGO_URI environment variable is missing. Check your Render configuration.")
+MONGO_URI = settings.MONGO_URI
+MONGO_DB = settings.MONGO_DB
 
 try:
     # Set a 5-second timeout for server selection so it fails quickly if offline
     client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
     # Trigger a connection check
     client.admin.command('ping')
-    db = client["resume_analyzer"]
+    db = client[MONGO_DB]
     users_collection = db["users"]
     resumes_collection = db["resumes"]
     print(f"MongoDB Connected Successfully to: {MONGO_URI}")

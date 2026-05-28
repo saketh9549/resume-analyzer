@@ -6,6 +6,7 @@ import logging
 import time
 import os
 import platform
+from config.settings import settings
 
 # Configure global logging
 logging.basicConfig(
@@ -34,17 +35,30 @@ _startup_time = time.time()
 
 @contextlib.asynccontextmanager
 async def lifespan(app: FastAPI):
+    logger = logging.getLogger(__name__)
+    logger.info("========================================")
+    logger.info(f"🚀 Starting ResumeAI Enterprise Backend")
+    logger.info(f"🌍 Environment: {settings.ENVIRONMENT.upper()}")
+    logger.info(f"☁️ Render Mode: {'Active' if settings.RENDER else 'Inactive'}")
+    logger.info("========================================")
+    
     try:
+        logger.info("⏳ Initializing MongoDB Connection...")
         await DatabaseConnection.connect_to_database()
+        logger.info("✅ MongoDB Connected successfully.")
+        
         try:
             from rag.knowledge_loader import KnowledgeLoader
             await KnowledgeLoader.seed_default_knowledge()
+            logger.info("✅ Default RAG knowledge seeded.")
         except Exception as se:
-            import logging
-            logging.getLogger(__name__).error(f"Failed to seed default RAG knowledge: {se}")
+            logger.error(f"⚠️ Failed to seed default RAG knowledge: {se}")
     except Exception as e:
-        import logging
-        logging.getLogger(__name__).error(f"Failed to connect to database on startup: {e}")
+        logger.error(f"❌ CRITICAL: Failed to connect to database on startup: {e}")
+        if settings.is_production:
+            import sys
+            sys.exit(1)
+            
     yield
     await DatabaseConnection.close_database_connection()
 
@@ -82,7 +96,7 @@ app.add_middleware(
         "http://localhost:5175",
         "http://127.0.0.1:5175",
     ],
-    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?",
+    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?|https?://.*\.onrender\.com",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

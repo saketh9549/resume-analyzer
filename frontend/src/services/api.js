@@ -2,10 +2,44 @@ const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000"
 
 const activeRequests = new Map()
 
-async function dedupedFetch(url, options = {}) {
+async function dedupedFetch(url, options = {}, retries = 2, timeout = 15000) {
   const method = options.method || "GET"
+  
+  // Wrap fetch in a timeout promise
+  const fetchWithTimeout = async (url, options) => {
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeout);
+    try {
+      const response = await fetch(url, { ...options, signal: controller.signal });
+      clearTimeout(id);
+      return response;
+    } catch (err) {
+      clearTimeout(id);
+      throw err;
+    }
+  };
+
+  const attemptFetch = async (currentAttempt) => {
+    try {
+      const response = await fetchWithTimeout(url, options);
+      if (!response.ok && response.status >= 500 && currentAttempt < retries) {
+        console.warn(`[API] 5xx Error on ${url}. Retrying... (${currentAttempt + 1}/${retries})`);
+        await new Promise(res => setTimeout(res, 1000 * (currentAttempt + 1)));
+        return attemptFetch(currentAttempt + 1);
+      }
+      return response;
+    } catch (err) {
+      if (currentAttempt < retries) {
+        console.warn(`[API] Network/Timeout on ${url}. Retrying... (${currentAttempt + 1}/${retries})`);
+        await new Promise(res => setTimeout(res, 1000 * (currentAttempt + 1)));
+        return attemptFetch(currentAttempt + 1);
+      }
+      throw err;
+    }
+  };
+
   if (method !== "GET") {
-    return fetch(url, options)
+    return attemptFetch(0);
   }
 
   const token = localStorage.getItem("token") || ""
@@ -16,7 +50,7 @@ async function dedupedFetch(url, options = {}) {
     return cachedResponse.clone()
   }
 
-  const promise = fetch(url, options).catch(err => {
+  const promise = attemptFetch(0).catch(err => {
     activeRequests.delete(key)
     throw err
   })

@@ -1,10 +1,7 @@
 import os
 import logging
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
-from dotenv import load_dotenv
-
-# Load configuration variables from dotenv file
-load_dotenv()
+from config.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -21,11 +18,9 @@ class DatabaseConnection:
         Establishes connection to MongoDB database and triggers index initialization.
         """
         if not uri:
-            uri = os.getenv("MONGO_URI")
-            if not uri:
-                raise ValueError("CRITICAL ERROR: MONGO_URI environment variable is missing. Check your Render configuration.")
+            uri = settings.MONGO_URI
         if not db_name:
-            db_name = os.getenv("MONGO_DB", "resume_analyzer")
+            db_name = settings.MONGO_DB
 
         logger.info(f"Connecting to MongoDB at URI: {uri}")
         try:
