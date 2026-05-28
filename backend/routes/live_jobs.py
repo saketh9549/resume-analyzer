@@ -101,48 +101,61 @@ async def fetch_and_cache_jobs() -> list:
 @router.get("/recommendations")
 async def get_live_job_recommendations(
     skills: str = "",
+    resume_id: str = "",
     current_user: dict = Depends(get_current_user)
 ):
     try:
-        all_jobs = await fetch_and_cache_jobs()
-        if not all_jobs:
-            return []
+        from jobs.career_preference_engine import CareerPreferenceEngine
+        from jobs.job_preference_matcher import JobPreferenceMatcher
+        from bson import ObjectId
 
-        # If no skills parameter, check user's last uploaded resume skills
+        preferences = CareerPreferenceEngine.get_preferences(current_user["email"])
+        
+        # Load user skills
         user_skills = []
-        if not skills and resumes_collection is not None:
-            last_resume = resumes_collection.find_one(
+        if resume_id and resumes_collection is not None:
+            try:
+                resume = resumes_collection.find_one({"_id": ObjectId(resume_id), "user_email": current_user["email"]})
+                if resume:
+                    user_skills = resume.get("skills", [])
+            except Exception:
+                pass
+
+        if not user_skills and resumes_collection is not None:
+            # Fallback to most recent resume
+            resume = resumes_collection.find_one(
                 {"user_email": current_user["email"]},
                 sort=[("upload_date", -1)]
             )
-            if last_resume:
-                user_skills = [s.lower() for s in last_resume.get("skills", [])]
+            if resume:
+                user_skills = resume.get("skills", [])
 
         if skills:
             user_skills = [s.strip().lower() for s in skills.split(",") if s.strip()]
 
-        if not user_skills:
-            # Return unfiltered top 15 jobs if no skills info
-            return all_jobs[:15]
+        all_jobs = await fetch_and_cache_jobs()
+        if not all_jobs:
+            return []
 
-        # Rank jobs by keyword match on title/description
+        # Rank jobs by preference match
         matched_jobs = []
         for job in all_jobs:
-            text = f"{job.get('title', '')} {job.get('description', '')}".lower()
-            matching_count = sum(1 for skill in user_skills if skill in text)
-            if matching_count > 0:
-                matched_jobs.append({
-                    **job,
-                    "matching_skills_count": matching_count
-                })
+            match_details = JobPreferenceMatcher.evaluate_preference_match(job, preferences, user_skills)
+            matched_jobs.append({
+                **job,
+                "match_percentage": match_details["match_percentage"],
+                "match_reasons": match_details["match_reasons"],
+                "skill_gaps": match_details["skill_gaps"],
+                "recommended_certifications": match_details["recommended_certifications"]
+            })
 
-        # Sort by matching count descending
-        matched_jobs.sort(key=lambda x: x.get("matching_skills_count", 0), reverse=True)
+        # Sort by match percentage descending
+        matched_jobs.sort(key=lambda x: x.get("match_percentage", 0), reverse=True)
         
         # Clean description HTML tags from output for clean SaaS UI render
         import re
         for job in matched_jobs:
-            desc = job["description"]
+            desc = job.get("description", "")
             clean_desc = re.sub(r'<[^>]*>', ' ', desc)
             clean_desc = re.sub(r'\s+', ' ', clean_desc).strip()
             job["description"] = clean_desc[:250] + "..." if len(clean_desc) > 250 else clean_desc

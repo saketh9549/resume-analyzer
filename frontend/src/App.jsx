@@ -7,6 +7,8 @@ import {
 } from "react-router-dom"
 
 import { ThemeProvider } from "./context/ThemeContext"
+import { ResumeProvider } from "./context/ResumeContext"
+import { CareerPreferenceProvider } from "./context/CareerPreferenceContext"
 import DashboardLayout from "./layouts/DashboardLayout"
 import AuthLayout from "./layouts/AuthLayout"
 
@@ -52,40 +54,44 @@ function ProtectedRoute({ children }) {
 function App() {
   return (
     <ThemeProvider>
-      <BrowserRouter>
-        <Suspense fallback={<LazyFallback />}>
-          <Routes>
-            {/* AUTHENTICATION WRAPPER ROUTE GROUP */}
-            <Route element={<AuthLayout />}>
-              <Route path="/login" element={<Login />} />
-              <Route path="/signup" element={<Signup />} />
-            </Route>
+      <ResumeProvider>
+        <CareerPreferenceProvider>
+          <BrowserRouter>
+            <Suspense fallback={<LazyFallback />}>
+              <Routes>
+                {/* AUTHENTICATION WRAPPER ROUTE GROUP */}
+                <Route element={<AuthLayout />}>
+                  <Route path="/login" element={<Login />} />
+                  <Route path="/signup" element={<Signup />} />
+                </Route>
 
-            {/* PROTECTED DASHBOARD CORE ROUTES */}
-            <Route
-              element={
-                <ProtectedRoute>
-                  <DashboardLayout />
-                </ProtectedRoute>
-              }
-            >
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/upload" element={<Upload />} />
-              <Route path="/jobs" element={<JobMatching />} />
-              <Route path="/rewriter" element={<ResumeRewriter />} />
-              <Route path="/interviews" element={<InterviewPrep />} />
-              <Route path="/live-jobs" element={<LiveJobs />} />
-              <Route path="/recruiter" element={<RecruiterConsole />} />
-              <Route path="/analytics" element={<Analytics />} />
-              <Route path="/profile" element={<Profile />} />
-              <Route path="/settings" element={<Settings />} />
-            </Route>
+                {/* PROTECTED DASHBOARD CORE ROUTES */}
+                <Route
+                  element={
+                    <ProtectedRoute>
+                      <DashboardLayout />
+                    </ProtectedRoute>
+                  }
+                >
+                  <Route path="/" element={<Dashboard />} />
+                  <Route path="/upload" element={<Upload />} />
+                  <Route path="/jobs" element={<JobMatching />} />
+                  <Route path="/rewriter" element={<ResumeRewriter />} />
+                  <Route path="/interviews" element={<InterviewPrep />} />
+                  <Route path="/live-jobs" element={<LiveJobs />} />
+                  <Route path="/recruiter" element={<RecruiterConsole />} />
+                  <Route path="/analytics" element={<Analytics />} />
+                  <Route path="/profile" element={<Profile />} />
+                  <Route path="/settings" element={<Settings />} />
+                </Route>
 
-            {/* Fallback route redirecting back to main landing index */}
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </Suspense>
-      </BrowserRouter>
+                {/* Fallback route redirecting back to main landing index */}
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </Suspense>
+          </BrowserRouter>
+        </CareerPreferenceProvider>
+      </ResumeProvider>
     </ThemeProvider>
   )
 }

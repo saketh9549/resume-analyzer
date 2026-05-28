@@ -10,8 +10,11 @@ import google.generativeai as genai
 from functools import partial
 
 from services.auth_service import get_current_user
-from database.mongodb import db, resumes_collection
+from database.mongodb import db, resumes_collection, users_collection
 from ai.response_parser import parse_ai_response
+from interviews.interview_context_builder import InterviewContextBuilder
+from interviews.resume_question_generator import ResumeQuestionGenerator
+from interviews.interview_ai_engine import InterviewAIEngine
 
 router = APIRouter()
 
@@ -22,6 +25,7 @@ class StartInterviewRequest(BaseModel):
     resume_id: str
     job_title: str
     difficulty: Optional[str] = "Intermediate"
+    mode: Optional[str] = "Technical"
 
 class SubmitAnswerRequest(BaseModel):
     session_id: str
@@ -55,58 +59,34 @@ async def start_interview(
     if not resume:
         raise HTTPException(status_code=404, detail="Resume record not found.")
 
-    questions = MOCK_QUESTIONS
-
-    if api_key:
-        try:
-            model = genai.GenerativeModel(
-                model_name="gemini-2.5-flash",
-                system_instruction="You are a Senior Technical Recruiter and Hiring Manager. Generate realistic technical, behavioral, and HR questions based on the candidate's resume and target job. Output in strict JSON format."
-            )
-            
-            prompt = f"""
-            Target Job Title: {payload.job_title}
-            Difficulty Level: {payload.difficulty}
-            Candidate Skills: {resume.get('skills', [])}
-            Projects: {[{'name': p.get('name'), 'technologies': p.get('technologies')} for p in resume.get('projects', [])]}
-            Experience: {[{'job_title': e.get('job_title'), 'duration': e.get('duration')} for e in resume.get('experience', [])]}
-            
-            Generate exactly 5 interview questions (mixture of technical, behavioral, and general HR) custom tailored for this candidate.
-            Output matching this JSON schema:
-            {{
-              "questions": [
-                {{
-                  "question": "the interview question string",
-                  "question_type": "technical | behavioral | hr",
-                  "ideal_concepts": ["concept 1 key phrase", "concept 2 key phrase"]
-                }}
-              ]
-            }}
-            """
-            
-            loop = asyncio.get_running_loop()
-            generation_config = {"response_mime_type": "application/json"}
-            
-            response = await loop.run_in_executor(
-                None,
-                partial(model.generate_content, prompt, generation_config=generation_config)
-            )
-            if response and response.text:
-                parsed = parse_ai_response(response.text, {"questions": MOCK_QUESTIONS})
-                questions = parsed.get("questions", MOCK_QUESTIONS)
-        except Exception as e:
-            logging.error(f"Gemini Interview generation failed: {e}. Using mock questions.")
+    try:
+        # Build context
+        context_data = InterviewContextBuilder.build_interview_context(payload.resume_id, current_user["email"])
+        
+        # Generate mode-specific questions
+        questions = await ResumeQuestionGenerator.generate_questions(
+            job_title=payload.job_title,
+            difficulty=payload.difficulty,
+            mode=payload.mode or "Technical",
+            context_data=context_data
+        )
+    except Exception as e:
+        logging.error(f"Failed to generate questions: {e}. Using mock fallbacks.")
+        questions = MOCK_QUESTIONS
 
     # Initialize session document
     session_questions = []
     for q in questions:
         session_questions.append({
             "question": q["question"],
-            "question_type": q.get("question_type", "technical"),
+            "question_type": q.get("question_type", payload.mode or "technical"),
             "ideal_concepts": q.get("ideal_concepts", []),
             "user_answer": "",
             "ai_evaluation": "",
-            "score": None
+            "score": None,
+            "confidence_score": None,
+            "improvement_suggestions": "",
+            "follow_up_question": ""
         })
 
     session_doc = {
@@ -114,6 +94,7 @@ async def start_interview(
         "resume_id": ObjectId(payload.resume_id),
         "job_title": payload.job_title,
         "difficulty": payload.difficulty,
+        "mode": payload.mode or "Technical",
         "questions": session_questions,
         "readiness_score": None,
         "overall_feedback": "",
@@ -126,6 +107,7 @@ async def start_interview(
         "session_id": str(result.inserted_id),
         "job_title": payload.job_title,
         "difficulty": payload.difficulty,
+        "mode": payload.mode or "Technical",
         "questions": [{"index": i, "question": q["question"], "question_type": q["question_type"]} for i, q in enumerate(session_questions)]
     }
 
@@ -153,50 +135,31 @@ async def submit_answer(
 
     target_q = questions[payload.question_index]
     
-    # Defaults
-    score = 75
-    evaluation = "Good response. Try to highlight more quantitative details from your work projects."
-
-    # Call Gemini for grading
-    if api_key:
-        try:
-            model = genai.GenerativeModel(
-                model_name="gemini-2.5-flash",
-                system_instruction="You are an expert Interview Evaluator. Grade the user's answer against the interview question and list of ideal concepts. Output in strict JSON format."
-            )
-            
-            prompt = f"""
-            Question: "{target_q['question']}"
-            Question Type: {target_q['question_type']}
-            Ideal Concepts: {target_q['ideal_concepts']}
-            User's Answer: "{payload.user_answer}"
-            
-            Provide a score (integer between 0 and 100) and constructive critique pointing out strengths and gaps in their answer.
-            Output matching this JSON schema:
-            {{
-              "score": 85,
-              "ai_evaluation": "Critique and improvements"
-            }}
-            """
-            
-            loop = asyncio.get_running_loop()
-            generation_config = {"response_mime_type": "application/json"}
-            
-            response = await loop.run_in_executor(
-                None,
-                partial(model.generate_content, prompt, generation_config=generation_config)
-            )
-            if response and response.text:
-                parsed = parse_ai_response(response.text, {"score": 75, "ai_evaluation": evaluation})
-                score = parsed.get("score", score)
-                evaluation = parsed.get("ai_evaluation", evaluation)
-        except Exception as e:
-            logging.error(f"Gemini grading failed: {e}")
+    # Run evaluation
+    try:
+        grade_res = await InterviewAIEngine.grade_answer(
+            question=target_q["question"],
+            question_type=target_q.get("question_type", "technical"),
+            ideal_concepts=target_q.get("ideal_concepts", []),
+            user_answer=payload.user_answer
+        )
+    except Exception as e:
+        logging.error(f"Grading exception: {e}")
+        grade_res = {
+            "score": 70,
+            "confidence_score": 65,
+            "ai_evaluation": "Grading failed. Assuming average score.",
+            "improvement_suggestions": "Try to expand on architectural trade-offs.",
+            "follow_up_question": "Can you explain how you would scale this component?"
+        }
 
     # Update question progress
     questions[payload.question_index]["user_answer"] = payload.user_answer
-    questions[payload.question_index]["ai_evaluation"] = evaluation
-    questions[payload.question_index]["score"] = int(score)
+    questions[payload.question_index]["ai_evaluation"] = grade_res["ai_evaluation"]
+    questions[payload.question_index]["score"] = int(grade_res["score"])
+    questions[payload.question_index]["confidence_score"] = int(grade_res["confidence_score"])
+    questions[payload.question_index]["improvement_suggestions"] = grade_res["improvement_suggestions"]
+    questions[payload.question_index]["follow_up_question"] = grade_res["follow_up_question"]
 
     interview_sessions_collection.update_one(
         {"_id": ObjectId(payload.session_id)},
@@ -205,8 +168,11 @@ async def submit_answer(
 
     return {
         "question_index": payload.question_index,
-        "score": score,
-        "ai_evaluation": evaluation
+        "score": grade_res["score"],
+        "confidence_score": grade_res["confidence_score"],
+        "ai_evaluation": grade_res["ai_evaluation"],
+        "improvement_suggestions": grade_res["improvement_suggestions"],
+        "follow_up_question": grade_res["follow_up_question"]
     }
 
 @router.post("/complete")
@@ -245,6 +211,33 @@ async def complete_interview(
             "overall_feedback": overall_feedback
         }}
     )
+
+    # Sync: Write to User's interview_history and ai_feedback_history
+    if users_collection is not None:
+        try:
+            users_collection.update_one(
+                {"email": current_user["email"]},
+                {
+                    "$push": {
+                        "interview_history": {
+                            "session_id": str(session["_id"]),
+                            "job_title": session.get("job_title"),
+                            "difficulty": session.get("difficulty"),
+                            "mode": session.get("mode", "Technical"),
+                            "readiness_score": readiness_score,
+                            "completed_at": datetime.now(timezone.utc).isoformat()
+                        },
+                        "ai_feedback_history": {
+                            "topic": f"Interview Mode: {session.get('mode', 'Technical')} for {session.get('job_title')}",
+                            "overall_feedback": overall_feedback,
+                            "score": readiness_score,
+                            "date": datetime.now(timezone.utc).isoformat()
+                        }
+                    }
+                }
+            )
+        except Exception as e:
+            logging.error(f"Failed to push user history: {e}")
 
     return {
         "session_id": payload.session_id,

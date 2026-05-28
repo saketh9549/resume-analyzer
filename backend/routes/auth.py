@@ -353,3 +353,51 @@ def verify_email(payload: VerifyEmailRequest):
     )
 
     return {"message": "Email verified successfully."}
+
+from typing import List, Optional
+
+class CareerPreferencesPayload(BaseModel):
+    preferred_roles: Optional[List[str]] = []
+    preferred_technologies: Optional[List[str]] = []
+    experience_level: Optional[str] = ""
+    preferred_industries: Optional[List[str]] = []
+    expected_salary: Optional[str] = ""
+    remote_preference: Optional[str] = ""
+    location_preference: Optional[str] = ""
+
+@router.get("/preferences")
+def get_preferences(current_user: dict = Depends(get_current_user)):
+    if users_collection is None:
+        raise HTTPException(status_code=503, detail="Database offline.")
+    
+    user = users_collection.find_one({"email": current_user["email"]})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+        
+    return user.get("career_preferences", {
+        "preferred_roles": [],
+        "preferred_technologies": [],
+        "experience_level": "",
+        "preferred_industries": [],
+        "expected_salary": "",
+        "remote_preference": "",
+        "location_preference": ""
+    })
+
+@router.post("/preferences")
+def save_preferences(payload: CareerPreferencesPayload, current_user: dict = Depends(get_current_user)):
+    if users_collection is None:
+        raise HTTPException(status_code=503, detail="Database offline.")
+        
+    pref_dict = payload.dict()
+    users_collection.update_one(
+        {"email": current_user["email"]},
+        {
+            "$set": {
+                "career_preferences": pref_dict,
+                "preferred_roles": payload.preferred_roles or [],
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }
+        }
+    )
+    return {"message": "Preferences saved successfully", "preferences": pref_dict}

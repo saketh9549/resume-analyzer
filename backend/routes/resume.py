@@ -131,6 +131,96 @@ async def list_resumes(
             detail=f"Failed to list resumes: {str(e)}"
         )
 
+@router.get("/user")
+async def get_user_resumes(
+    current_user: dict = Depends(get_current_user)
+):
+    if resumes_collection is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database offline"
+        )
+    try:
+        cursor = resumes_collection.find({"user_email": current_user["email"]}).sort("upload_date", -1)
+        results = []
+        for doc in cursor:
+            results.append({
+                "id": str(doc["_id"]),
+                "name": doc["filename"],
+                "score": f"{doc.get('ats_score', 0)}%",
+                "date": (doc.get("upload_date") or doc.get("date") or "")[:10],
+                "category": doc.get("category", "Others"),
+                "analysis_status": doc.get("analysis_status", "analyzed")
+            })
+        return results
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to list resumes: {str(e)}"
+        )
+
+@router.get("/{resume_id}")
+async def get_resume_by_id(
+    resume_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    if resumes_collection is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database offline"
+        )
+    try:
+        if not ObjectId.is_valid(resume_id):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid resume ID format."
+            )
+        doc = resumes_collection.find_one({
+            "_id": ObjectId(resume_id),
+            "user_email": current_user["email"]
+        })
+        if not doc:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Resume record not found."
+            )
+        return {
+            "id": str(doc["_id"]),
+            "filename": doc["filename"],
+            "skills": doc.get("skills", []),
+            "education": doc.get("education", []),
+            "experience": doc.get("experience", []),
+            "projects": doc.get("projects", []),
+            "certifications": doc.get("certifications", []),
+            "contact": doc.get("contact", {}),
+            "ats_score": doc.get("ats_score", 0),
+            "category_scores": doc.get("category_scores", {}),
+            "missing_skills": doc.get("missing_skills", []),
+            "suggestions": doc.get("suggestions", []),
+            "detected_strengths": doc.get("detected_strengths", []),
+            "optimization_recommendations": doc.get("optimization_recommendations", []),
+            "extracted_entities": doc.get("extracted_entities", {}),
+            "ats_breakdown": doc.get("ats_breakdown", []),
+            "feedback_history": doc.get("feedback_history", {}),
+            "section_confidences": doc.get("section_confidences", {}),
+            "section_diagnostics": doc.get("section_diagnostics", {}),
+            "extracted_skills": doc.get("extracted_skills", doc.get("skills", [])),
+            "semantic_tags": doc.get("semantic_tags", []),
+            "recruiter_score": doc.get("recruiter_score", 0),
+            "interview_topics": doc.get("interview_topics", []),
+            "ai_context": doc.get("ai_context", {}),
+            "embeddings": doc.get("embeddings", {}),
+            "ats_weaknesses": doc.get("ats_weaknesses", doc.get("missing_skills", [])),
+            "upload_date": doc.get("upload_date")
+        }
+    except Exception as e:
+        if isinstance(e, HTTPException):
+            raise e
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch resume: {str(e)}"
+        )
+
 @router.get("/preview/{resume_id}")
 async def preview_resume_endpoint(
     resume_id: str,

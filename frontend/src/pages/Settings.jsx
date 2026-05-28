@@ -1,9 +1,10 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import SettingsCard from "../components/SettingsCard"
 import ThemeToggle from "../components/ThemeToggle"
 import { Eye, EyeOff, Shield, Bell, LayoutGrid, Database, KeyRound, LogOut, Cpu, Briefcase } from "lucide-react"
 import { changePassword } from "../services/api"
+import { useCareerPreferences } from "../context/CareerPreferenceContext"
 
 function Settings() {
   const [activeSubTab, setActiveSubTab] = useState("appearance")
@@ -31,12 +32,31 @@ function Settings() {
   // Mock settings save state
   const [saveNotifySuccess, setSaveNotifySuccess] = useState(false)
 
+  // Career Preferences Context
+  const { preferences, updatePreferences } = useCareerPreferences()
+
   // Preferred Career Targets States
-  const [prefIndustries, setPrefIndustries] = useState(() => localStorage.getItem("preferredIndustries") || "Software Engineering, Artificial Intelligence, Data & Analytics")
-  const [prefRoles, setPrefRoles] = useState(() => localStorage.getItem("preferredRoles") || "Frontend Developer, Backend Developer, DevOps Engineer")
-  const [prefExpLevel, setPrefExpLevel] = useState(() => localStorage.getItem("preferredExperienceLevel") || "Intermediate")
-  const [prefLocation, setPrefLocation] = useState(() => localStorage.getItem("preferredLocation") || "Remote, New York, San Francisco")
+  const [prefIndustries, setPrefIndustries] = useState("")
+  const [prefRoles, setPrefRoles] = useState("")
+  const [prefTechnologies, setPrefTechnologies] = useState("")
+  const [prefExpLevel, setPrefExpLevel] = useState("Intermediate")
+  const [prefLocation, setPrefLocation] = useState("")
+  const [expectedSalary, setExpectedSalary] = useState("")
+  const [remotePreference, setRemotePreference] = useState("remote")
   const [saveCareerSuccess, setSaveCareerSuccess] = useState(false)
+
+  // Sync state values with global context
+  useEffect(() => {
+    if (preferences) {
+      setPrefIndustries(Array.isArray(preferences.preferred_industries) ? preferences.preferred_industries.join(", ") : preferences.preferred_industries || "")
+      setPrefRoles(Array.isArray(preferences.preferred_roles) ? preferences.preferred_roles.join(", ") : preferences.preferred_roles || "")
+      setPrefTechnologies(Array.isArray(preferences.preferred_technologies) ? preferences.preferred_technologies.join(", ") : preferences.preferred_technologies || "")
+      setPrefExpLevel(preferences.experience_level || "Intermediate")
+      setPrefLocation(preferences.location_preference || "")
+      setExpectedSalary(preferences.expected_salary || "")
+      setRemotePreference(preferences.remote_preference || "remote")
+    }
+  }, [preferences])
 
   async function handlePasswordReset(e) {
     e.preventDefault()
@@ -98,16 +118,39 @@ function Settings() {
     }, 3000)
   }
 
-  function handleSaveCareerConfig(e) {
+  async function handleSaveCareerConfig(e) {
     e.preventDefault()
+    
+    const industriesArr = prefIndustries.split(",").map(s => s.trim()).filter(Boolean)
+    const rolesArr = prefRoles.split(",").map(s => s.trim()).filter(Boolean)
+    const techArr = prefTechnologies.split(",").map(s => s.trim()).filter(Boolean)
+    
+    const payload = {
+      preferred_industries: industriesArr,
+      preferred_roles: rolesArr,
+      preferred_technologies: techArr,
+      experience_level: prefExpLevel,
+      location_preference: prefLocation,
+      expected_salary: expectedSalary,
+      remote_preference: remotePreference
+    }
+    
+    // Save to local storage for backward compatibility / fallback
     localStorage.setItem("preferredIndustries", prefIndustries)
     localStorage.setItem("preferredRoles", prefRoles)
     localStorage.setItem("preferredExperienceLevel", prefExpLevel)
     localStorage.setItem("preferredLocation", prefLocation)
-    setSaveCareerSuccess(true)
-    setTimeout(() => {
-      setSaveCareerSuccess(false)
-    }, 3000)
+    localStorage.setItem("preferredTechnologies", prefTechnologies)
+    localStorage.setItem("expectedSalary", expectedSalary)
+    localStorage.setItem("remotePreference", remotePreference)
+
+    const res = await updatePreferences(payload)
+    if (res && !res.error) {
+      setSaveCareerSuccess(true)
+      setTimeout(() => {
+        setSaveCareerSuccess(false)
+      }, 3000)
+    }
   }
 
   const subTabs = [
@@ -401,53 +444,94 @@ function Settings() {
               description="Customize your industry, job roles, and locations to guide the AI Matching Engine."
             >
               <form onSubmit={handleSaveCareerConfig} className="space-y-5">
-                <div>
-                  <label className="block text-sm text-gray-400 font-semibold mb-2">Preferred Industries (comma-separated)</label>
-                  <input
-                    type="text"
-                    value={prefIndustries}
-                    onChange={(e) => setPrefIndustries(e.target.value)}
-                    className="w-full bg-slate-900 border border-white/10 text-gray-200 outline-none rounded-2xl px-5 py-3.5 focus:border-blue-500 transition"
-                    placeholder="e.g. Software Engineering, AI, FinTech"
-                  />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div>
+                    <label className="block text-sm text-gray-400 font-semibold mb-2">Preferred Industries (comma-separated)</label>
+                    <input
+                      type="text"
+                      value={prefIndustries}
+                      onChange={(e) => setPrefIndustries(e.target.value)}
+                      className="w-full bg-slate-900 border border-white/10 text-gray-200 outline-none rounded-2xl px-5 py-3.5 focus:border-blue-500 transition text-sm"
+                      placeholder="e.g. Software Engineering, AI, FinTech"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm text-gray-400 font-semibold mb-2">Preferred Roles (comma-separated)</label>
+                    <input
+                      type="text"
+                      value={prefRoles}
+                      onChange={(e) => setPrefRoles(e.target.value)}
+                      className="w-full bg-slate-900 border border-white/10 text-gray-200 outline-none rounded-2xl px-5 py-3.5 focus:border-blue-500 transition text-sm"
+                      placeholder="e.g. Frontend Developer, Full Stack Engineer"
+                    />
+                  </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm text-gray-400 font-semibold mb-2">Preferred Roles (comma-separated)</label>
-                  <input
-                    type="text"
-                    value={prefRoles}
-                    onChange={(e) => setPrefRoles(e.target.value)}
-                    className="w-full bg-slate-900 border border-white/10 text-gray-200 outline-none rounded-2xl px-5 py-3.5 focus:border-blue-500 transition"
-                    placeholder="e.g. Frontend Developer, Full Stack Engineer"
-                  />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div>
+                    <label className="block text-sm text-gray-400 font-semibold mb-2">Preferred Technologies (comma-separated)</label>
+                    <input
+                      type="text"
+                      value={prefTechnologies}
+                      onChange={(e) => setPrefTechnologies(e.target.value)}
+                      className="w-full bg-slate-900 border border-white/10 text-gray-200 outline-none rounded-2xl px-5 py-3.5 focus:border-blue-500 transition text-sm"
+                      placeholder="e.g. Python, FastAPI, React, Docker"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm text-gray-400 font-semibold mb-2">Expected Annual Salary</label>
+                    <input
+                      type="text"
+                      value={expectedSalary}
+                      onChange={(e) => setExpectedSalary(e.target.value)}
+                      className="w-full bg-slate-900 border border-white/10 text-gray-200 outline-none rounded-2xl px-5 py-3.5 focus:border-blue-500 transition text-sm"
+                      placeholder="e.g. $100k - $120k"
+                    />
+                  </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm text-gray-400 font-semibold mb-2">Target Experience Level</label>
-                  <select
-                    value={prefExpLevel}
-                    onChange={(e) => setPrefExpLevel(e.target.value)}
-                    className="w-full bg-slate-900 border border-white/10 text-gray-200 outline-none rounded-2xl px-5 py-3.5 focus:border-blue-500 transition"
-                  >
-                    <option value="Junior">Junior (0-2 Years)</option>
-                    <option value="Intermediate">Intermediate (3-5 Years)</option>
-                    <option value="Senior">Senior (5+ Years)</option>
-                  </select>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                  <div>
+                    <label className="block text-sm text-gray-400 font-semibold mb-2">Target Experience Level</label>
+                    <select
+                      value={prefExpLevel}
+                      onChange={(e) => setPrefExpLevel(e.target.value)}
+                      className="w-full bg-slate-900 border border-white/10 text-gray-200 outline-none rounded-2xl px-5 py-3.5 focus:border-blue-500 transition text-sm"
+                    >
+                      <option value="Junior">Junior (0-2 Years)</option>
+                      <option value="Intermediate">Intermediate (3-5 Years)</option>
+                      <option value="Senior">Senior (5+ Years)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm text-gray-400 font-semibold mb-2">Remote Work Model</label>
+                    <select
+                      value={remotePreference}
+                      onChange={(e) => setRemotePreference(e.target.value)}
+                      className="w-full bg-slate-900 border border-white/10 text-gray-200 outline-none rounded-2xl px-5 py-3.5 focus:border-blue-500 transition text-sm"
+                    >
+                      <option value="remote">Fully Remote</option>
+                      <option value="hybrid">Hybrid</option>
+                      <option value="onsite">On-site / In-Office</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm text-gray-400 font-semibold mb-2">Preferred Locations</label>
+                    <input
+                      type="text"
+                      value={prefLocation}
+                      onChange={(e) => setPrefLocation(e.target.value)}
+                      className="w-full bg-slate-900 border border-white/10 text-gray-200 outline-none rounded-2xl px-5 py-3.5 focus:border-blue-500 transition text-sm"
+                      placeholder="e.g. San Francisco, London"
+                    />
+                  </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm text-gray-400 font-semibold mb-2">Preferred Location / Remote</label>
-                  <input
-                    type="text"
-                    value={prefLocation}
-                    onChange={(e) => setPrefLocation(e.target.value)}
-                    className="w-full bg-slate-900 border border-white/10 text-gray-200 outline-none rounded-2xl px-5 py-3.5 focus:border-blue-500 transition"
-                    placeholder="e.g. Remote, San Francisco, India"
-                  />
-                </div>
-
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-4 pt-2">
                   <button
                     type="submit"
                     className="px-6 py-3.5 rounded-2xl bg-blue-500 hover:bg-blue-600 transition font-semibold cursor-pointer"
@@ -455,7 +539,7 @@ function Settings() {
                     Save Preferences
                   </button>
                   {saveCareerSuccess && (
-                    <span className="text-green-400 text-sm font-semibold">Career preferences saved!</span>
+                    <span className="text-green-400 text-sm font-semibold">Career preferences synchronized!</span>
                   )}
                 </div>
               </form>

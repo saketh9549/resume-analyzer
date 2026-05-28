@@ -68,6 +68,12 @@ app.include_router(
 )
 
 app.include_router(
+    resume_router,
+    prefix="/resumes",
+    tags=["Resume"]
+)
+
+app.include_router(
     ai_router,
     prefix="/ai",
     tags=["AI Feedback"]

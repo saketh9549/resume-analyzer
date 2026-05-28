@@ -1,13 +1,14 @@
 import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
-import { getRecentUploads, rewriteResumeSection } from "../services/api"
+import { rewriteResumeSection } from "../services/api"
 import { Sparkles, RefreshCw, FileText, CheckCircle2, ChevronRight, AlertCircle, Copy, Check } from "lucide-react"
 import { useToast } from "../context/ToastContext"
+import { useResume } from "../context/ResumeContext"
+import ResumeSelector from "../components/ResumeSelector"
 
 function ResumeRewriter() {
-  const [resumes, setResumes] = useState([])
-  const [selectedResumeId, setSelectedResumeId] = useState("")
-  const [loadingResumes, setLoadingResumes] = useState(true)
+  const { resumes, activeResume, loading: loadingResumes } = useResume()
+  const selectedResumeId = activeResume?.id || ""
   const { showToast } = useToast()
 
   // Form states
@@ -21,28 +22,11 @@ function ResumeRewriter() {
   const [copied, setCopied] = useState(false)
   const [applied, setApplied] = useState(false)
 
+  // Selected resume changes clear result
   useEffect(() => {
-    async function loadResumes() {
-      try {
-        const data = await getRecentUploads()
-        if (data && data.error) {
-          showToast(`Failed to load resumes: ${data.error}`, "error")
-          setResumes([])
-        } else {
-          setResumes(data || [])
-          if (data && data.length > 0) {
-            setSelectedResumeId(data[0].id)
-          }
-        }
-      } catch (err) {
-        console.error(err)
-        showToast("An unexpected error occurred while loading resumes.", "error")
-      } finally {
-        setLoadingResumes(false)
-      }
-    }
-    loadResumes()
-  }, [])
+    setRewriteResult(null)
+    setApplied(false)
+  }, [activeResume])
 
   const handleRunRewrite = async (e) => {
     e.preventDefault()
@@ -89,21 +73,11 @@ function ResumeRewriter() {
           </p>
         </div>
 
-        {/* Dropdown Selector */}
+        {/* Global Selector */}
         {!loadingResumes && resumes.length > 0 && (
-          <div className="flex items-center gap-3 bg-white/5 border border-white/10 p-3 rounded-2xl backdrop-blur-md">
-            <FileText size={18} className="text-blue-400" />
-            <select
-              value={selectedResumeId}
-              onChange={(e) => setSelectedResumeId(e.target.value)}
-              className="bg-transparent text-gray-200 outline-none font-semibold text-sm cursor-pointer"
-            >
-              {resumes.map(r => (
-                <option key={r.id} value={r.id} className="bg-slate-900 text-gray-200">
-                  {r.name} ({r.score})
-                </option>
-              ))}
-            </select>
+          <div className="flex flex-col gap-1">
+            <span className="text-xs font-semibold text-gray-400">Active Workspace Resume:</span>
+            <ResumeSelector />
           </div>
         )}
       </div>

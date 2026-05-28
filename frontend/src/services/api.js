@@ -280,12 +280,12 @@ export async function rewriteResumeSection(resumeId, section, originalText, focu
 }
 
 // Enterprise Interview Prep
-export async function startMockInterview(resumeId, jobTitle, difficulty = "Intermediate") {
+export async function startMockInterview(resumeId, jobTitle, difficulty = "Intermediate", mode = "Technical") {
   try {
     const response = await fetch(`${BASE_URL}/interviews/start`, {
       method: "POST",
       headers: getAuthHeaders(),
-      body: JSON.stringify({ resume_id: resumeId, job_title: jobTitle, difficulty })
+      body: JSON.stringify({ resume_id: resumeId, job_title: jobTitle, difficulty, mode })
     })
     return await handleResponse(response)
   } catch (error) {
@@ -336,9 +336,9 @@ export async function getInterviewHistory() {
 }
 
 // Enterprise Live Jobs
-export async function getLiveJobs(skills = "") {
+export async function getLiveJobs(skills = "", resumeId = "") {
   try {
-    const response = await fetch(`${BASE_URL}/live-jobs/recommendations?skills=${encodeURIComponent(skills)}`, {
+    const response = await fetch(`${BASE_URL}/live-jobs/recommendations?skills=${encodeURIComponent(skills)}&resume_id=${encodeURIComponent(resumeId)}`, {
       method: "GET",
       headers: getAuthHeaders()
     })
