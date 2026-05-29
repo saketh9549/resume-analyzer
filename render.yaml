@@ -10,7 +10,7 @@ services:
       - key: PYTHON_VERSION
         value: 3.12.0
       - key: MONGO_URI
-        value: mongodb+srv://sakethgudapati_db_user:dNIJcyzIYxTfRs5L@cluster0.qu6jdhv.mongodb.net/
+        value: mongodb://sakethgudapati_db_user:dNIJcyzIYxTfRs5L@ac-szwjtv3-shard-00-00.qu6jdhv.mongodb.net:27017,ac-szwjtv3-shard-00-01.qu6jdhv.mongodb.net:27017,ac-szwjtv3-shard-00-02.qu6jdhv.mongodb.net:27017/?authSource=admin&replicaSet=atlas-txiz5x-shard-0&tls=true
       - key: GEMINI_API_KEY
         sync: false
       - key: JWT_SECRET
