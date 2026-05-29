@@ -8,7 +8,8 @@ from database.mongodb import db, resumes_collection
 
 router = APIRouter()
 
-live_jobs_cache_collection = db["live_jobs_cache"] if db is not None else None
+from database.connection import DatabaseConnection
+
 logger = logging.getLogger(__name__)
 
 # Fallback jobs if API fails
@@ -75,14 +76,14 @@ async def fetch_and_cache_jobs() -> list:
     """
     CACHE_TTL_MINUTES = 30
 
-    if live_jobs_cache_collection is None:
+    if DatabaseConnection.db is None:
         return MOCK_LIVE_JOBS
 
     # Check cache freshness first (fast DB read)
     try:
-        cache_doc = live_jobs_cache_collection.find_one(
+        cache_doc = await DatabaseConnection.db["live_jobs_cache"].find_one(
             {"type": "remotive_cache"},
-            {"updated_at": 1, "jobs": 1}  # projection — skip _id overhead
+            projection={"updated_at": 1, "jobs": 1}  # projection — skip _id overhead
         )
         if cache_doc:
             updated_at = datetime.fromisoformat(cache_doc["updated_at"])
@@ -96,7 +97,7 @@ async def fetch_and_cache_jobs() -> list:
         jobs = await _fetch_jobs_from_remotive()
 
         # Update cache document
-        live_jobs_cache_collection.update_one(
+        await DatabaseConnection.db["live_jobs_cache"].update_one(
             {"type": "remotive_cache"},
             {"$set": {
                 "type": "remotive_cache",
@@ -110,9 +111,9 @@ async def fetch_and_cache_jobs() -> list:
         logger.error(f"Failed to fetch live Remotive jobs: {e}. Serving from stale cache.")
         # Serve stale cache on API failure
         try:
-            cache_doc = live_jobs_cache_collection.find_one(
+            cache_doc = await DatabaseConnection.db["live_jobs_cache"].find_one(
                 {"type": "remotive_cache"},
-                {"jobs": 1}
+                projection={"jobs": 1}
             )
             if cache_doc:
                 return cache_doc.get("jobs", [])
@@ -139,17 +140,17 @@ async def get_live_job_recommendations(
 
         # Load user skills
         user_skills = []
-        if resume_id and resumes_collection is not None:
+        if resume_id and DatabaseConnection.db is not None:
             try:
-                resume = resumes_collection.find_one({"_id": ObjectId(resume_id), "user_email": current_user["email"]})
+                resume = await DatabaseConnection.db["resumes"].find_one({"_id": ObjectId(resume_id), "user_email": current_user["email"]})
                 if resume:
                     user_skills = resume.get("skills", [])
             except Exception:
                 pass
 
-        if not user_skills and resumes_collection is not None:
+        if not user_skills and DatabaseConnection.db is not None:
             # Fallback to most recent resume
-            resume = resumes_collection.find_one(
+            resume = await DatabaseConnection.db["resumes"].find_one(
                 {"user_email": current_user["email"]},
                 sort=[("upload_date", -1)]
             )
