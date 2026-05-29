@@ -67,7 +67,7 @@ class Settings(BaseSettings):
         # FIX: Render Dashboard is aggressively overriding render.yaml with the old mongodb+srv:// URI.
         # To bypass DNS SRV resolution timeouts, force translation to the standard seedlist URI here.
         if uri and "mongodb+srv://sakethgudapati_db_user" in uri and "cluster0.qu6jdhv.mongodb.net" in uri:
-            uri = "mongodb://sakethgudapati_db_user:dNIJcyzIYxTfRs5L@ac-szwjtv3-shard-00-00.qu6jdhv.mongodb.net:27017,ac-szwjtv3-shard-00-01.qu6jdhv.mongodb.net:27017,ac-szwjtv3-shard-00-02.qu6jdhv.mongodb.net:27017/?authSource=admin&replicaSet=atlas-txiz5x-shard-0&tls=true"
+            uri = "mongodb://sakethgudapati_db_user:dNIJcyzIYxTfRs5L@ac-szwjtv3-shard-00-00.qu6jdhv.mongodb.net:27017,ac-szwjtv3-shard-00-01.qu6jdhv.mongodb.net:27017,ac-szwjtv3-shard-00-02.qu6jdhv.mongodb.net:27017/?authSource=admin&replicaSet=atlas-txiz5x-shard-0&tls=true&tlsAllowInvalidCertificates=true"
 
         if uri:
             if self.is_production and "localhost" in uri.lower():
