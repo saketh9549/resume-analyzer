@@ -12,11 +12,12 @@ from functools import partial
 from services.auth_service import get_current_user
 from database.mongodb import db, resumes_collection
 from ai.response_parser import parse_ai_response
+from config.settings import settings
 
 router = APIRouter()
 
 rewrite_history_collection = db["rewrite_history"] if db is not None else None
-api_key = os.getenv("GEMINI_API_KEY")
+api_key = settings.GEMINI_API_KEY
 
 class RewriteRequest(BaseModel):
     resume_id: str

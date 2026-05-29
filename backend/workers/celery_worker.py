@@ -1,19 +1,21 @@
-import os
 import logging
 from celery import Celery
+from config.settings import settings
 
 logger = logging.getLogger(__name__)
 
-# Load Redis configs from environment variables, default to loopback
-REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+REDIS_URL = settings.REDIS_URL
 
-# Initialize Celery app context
-celery_app = Celery(
-    "resume_tasks",
-    broker=REDIS_URL,
-    backend=REDIS_URL,
-    include=["workers.tasks"]
-)
+if REDIS_URL:
+    # Initialize Celery app context
+    celery_app = Celery(
+        "resume_tasks",
+        broker=REDIS_URL,
+        backend=REDIS_URL,
+        include=["workers.tasks"]
+    )
+else:
+    celery_app = Celery("resume_tasks", include=["workers.tasks"])
 
 # Optional configuration settings
 celery_app.conf.update(
@@ -32,6 +34,9 @@ def is_redis_available() -> bool:
     Used by routing APIs to dynamically decide whether to execute tasks in background 
     or fall back to immediate inline processing to avoid user hang ups.
     """
+    if not REDIS_URL:
+        return False
+        
     try:
         import redis
         r = redis.Redis.from_url(REDIS_URL, socket_connect_timeout=2)

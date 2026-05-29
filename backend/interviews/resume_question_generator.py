@@ -6,9 +6,10 @@ from typing import Dict, Any, List
 from functools import partial
 import google.generativeai as genai
 from ai.response_parser import parse_ai_response
+from config.settings import settings
 
 logger = logging.getLogger(__name__)
-api_key = os.getenv("GEMINI_API_KEY")
+api_key = settings.GEMINI_API_KEY
 
 class ResumeQuestionGenerator:
     @staticmethod

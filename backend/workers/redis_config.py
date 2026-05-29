@@ -1,16 +1,16 @@
-import os
 import logging
 import redis
+from config.settings import settings
 
 logger = logging.getLogger(__name__)
-
-REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 
 def get_redis_client():
     """
     Returns a configured Redis client instance.
     """
-    return redis.Redis.from_url(REDIS_URL, decode_responses=True)
+    if not settings.REDIS_URL:
+        raise ValueError("REDIS_URL is not configured.")
+    return redis.Redis.from_url(settings.REDIS_URL, decode_responses=True)
 
 def is_redis_active() -> bool:
     """

@@ -1,9 +1,9 @@
-import os
 import jwt
 from datetime import datetime, timedelta, timezone
 from fastapi.security import OAuth2PasswordBearer
+from config.settings import settings
 
-SECRET_KEY = os.getenv("JWT_SECRET", "resume_analyzer_secret_key_secure_32_bytes")
+SECRET_KEY = settings.JWT_SECRET
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login", auto_error=False)
 
 def create_access_token(data: dict) -> str:

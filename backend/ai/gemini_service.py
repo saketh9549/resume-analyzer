@@ -83,7 +83,7 @@ RECOMMEND_FALLBACK = {
 }
 
 # Configure Gemini API Key
-api_key = os.getenv("GEMINI_API_KEY")
+api_key = settings.GEMINI_API_KEY
 if api_key:
     genai.configure(api_key=api_key)
     logger.info("Gemini API client initialized successfully.")

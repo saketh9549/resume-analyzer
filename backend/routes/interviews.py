@@ -15,11 +15,12 @@ from ai.response_parser import parse_ai_response
 from interviews.interview_context_builder import InterviewContextBuilder
 from interviews.resume_question_generator import ResumeQuestionGenerator
 from interviews.interview_ai_engine import InterviewAIEngine
+from config.settings import settings
 
 router = APIRouter()
 
 interview_sessions_collection = db["interview_sessions"] if db is not None else None
-api_key = os.getenv("GEMINI_API_KEY")
+api_key = settings.GEMINI_API_KEY
 
 class StartInterviewRequest(BaseModel):
     resume_id: str

@@ -6,6 +6,7 @@ from typing import List
 from functools import partial
 import google.generativeai as genai
 from database.mongodb import db
+from config.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -13,7 +14,7 @@ logger = logging.getLogger(__name__)
 embedding_cache_collection = db["embeddings_cache"] if db is not None else None
 
 # Check API configuration
-api_key = os.getenv("GEMINI_API_KEY")
+api_key = settings.GEMINI_API_KEY
 if api_key:
     genai.configure(api_key=api_key)
 
