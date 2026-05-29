@@ -24,7 +24,17 @@ logger = logging.getLogger(__name__)
 # Initialize MongoClient lazily. It will NOT establish a connection until the first query.
 # This prevents synchronous network blocking during FastAPI's async startup.
 try:
-    client = MongoClient(MONGO_URI)
+    import certifi
+    kwargs = {
+        "serverSelectionTimeoutMS": 30000,
+        "connectTimeoutMS": 30000,
+        "retryWrites": True,
+        "w": "majority"
+    }
+    if MONGO_URI and "localhost" not in MONGO_URI and "127.0.0.1" not in MONGO_URI:
+        kwargs["tlsCAFile"] = certifi.where()
+
+    client = MongoClient(MONGO_URI, **kwargs)
     db = client[MONGO_DB]
     users_collection = db["users"]
     resumes_collection = db["resumes"]

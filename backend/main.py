@@ -53,11 +53,35 @@ async def lifespan(app: FastAPI):
     env_str = "Production" if settings.is_production else settings.ENVIRONMENT.capitalize()
     logger.info(f"Environment:\n{env_str}\n")
     
+    # Diagnostics (SSL/TLS checks)
+    import sys
+    import ssl
+    import pymongo
+    import motor
+    import urllib.parse
+
+    logger.info("--- SYSTEM DIAGNOSTICS ---")
+    logger.info(f"Python Version: {sys.version.split()[0]}")
+    logger.info(f"OpenSSL Version: {ssl.OPENSSL_VERSION}")
+    logger.info(f"PyMongo Version: {pymongo.__version__}")
+    logger.info(f"Motor Version: {motor.version}")
+    
     # Check if MONGO_URI is present
     mongo_source = "Environment Variable (MONGODB_URI or MONGO_URI)" if os.getenv("MONGODB_URI") or os.getenv("MONGO_URI") else "Fallback / Missing"
     has_mongo = "YES" if settings.get_mongo_uri and "localhost" not in settings.get_mongo_uri.lower() else "NO (or localhost)"
     logger.info(f"Mongo URI Source: {mongo_source}")
-    logger.info(f"Mongo URI Loaded: {has_mongo}\n")
+    logger.info(f"Mongo URI Loaded: {has_mongo}")
+    
+    if settings.get_mongo_uri:
+        try:
+            parsed = urllib.parse.urlparse(settings.get_mongo_uri)
+            logger.info(f"Atlas Hostname: {parsed.hostname}")
+            # Identify TLS intent based on scheme
+            tls_config = "Enabled (mongodb+srv implies TLS)" if parsed.scheme == "mongodb+srv" else "Manual/Default"
+            logger.info(f"TLS Configuration: {tls_config}")
+        except Exception:
+            logger.info("TLS Configuration: Unable to parse URI safely")
+    logger.info("--------------------------\n")
     
     # Mask MONGO_URI for safe logging
     if settings.get_mongo_uri:
@@ -212,12 +236,12 @@ async def health_check_db():
             await DatabaseConnection.client.admin.command("ping")
             return {"database": "connected"}
         else:
-            return {"database": "failed"}
+            return {"database": "failed", "reason": "DatabaseConnection.db is None"}
             
     except Exception as e:
         import logging
         logging.getLogger(__name__).error(f"Health check failed: {e}")
-        return {"database": "failed"}
+        return {"database": "failed", "reason": str(e)}
 
 @app.get("/health/env", tags=["System"])
 async def health_check_env():

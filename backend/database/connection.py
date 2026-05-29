@@ -24,8 +24,17 @@ class DatabaseConnection:
 
         logger.info(f"Connecting to MongoDB at URI: {uri}")
         try:
-            # Set a 5-second timeout limit for connections to fail fast if port is blocked
-            cls.client = AsyncIOMotorClient(uri, serverSelectionTimeoutMS=5000)
+            import certifi
+            kwargs = {
+                "serverSelectionTimeoutMS": 30000,
+                "connectTimeoutMS": 30000,
+                "retryWrites": True,
+                "w": "majority"
+            }
+            if "localhost" not in uri and "127.0.0.1" not in uri:
+                kwargs["tlsCAFile"] = certifi.where()
+
+            cls.client = AsyncIOMotorClient(uri, **kwargs)
             cls.db = cls.client[db_name]
             
             # Send server ping command to verify database handshake
