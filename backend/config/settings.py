@@ -65,6 +65,8 @@ class Settings(BaseSettings):
         uri = self.MONGODB_URI or self.MONGO_URI or os.getenv("MONGODB_URI") or os.getenv("MONGO_URI")
         
         if uri:
+            if self.is_production and "localhost" in uri.lower():
+                return None # Reject localhost in production even if explicitly provided
             return uri
             
         if self.is_production:
