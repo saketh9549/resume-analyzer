@@ -52,8 +52,9 @@ async def match_resume_jobs(
         )
 
     try:
+        from database.connection import DatabaseConnection
         # Retrieve the resume document
-        resume = resumes_collection.find_one({
+        resume = await DatabaseConnection.db["resumes"].find_one({
             "_id": ObjectId(payload.resume_id),
             "user_email": current_user["email"]
         })
@@ -97,9 +98,9 @@ async def match_resume_jobs(
         }
 
         # Persist feedback in MongoDB
-        if job_matches_collection is not None:
+        if DatabaseConnection.db is not None:
             # Upsert matching document
-            job_matches_collection.update_one(
+            await DatabaseConnection.db["job_matches"].update_one(
                 {"resume_id": ObjectId(payload.resume_id)},
                 {"$set": match_doc},
                 upsert=True

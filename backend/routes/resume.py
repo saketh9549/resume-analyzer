@@ -370,12 +370,13 @@ async def get_resume_by_id(
             detail="Database offline"
         )
     try:
+        from database.connection import DatabaseConnection
         if not ObjectId.is_valid(resume_id):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid resume ID format."
             )
-        doc = resumes_collection.find_one({
+        doc = await DatabaseConnection.db["resumes"].find_one({
             "_id": ObjectId(resume_id),
             "user_email": current_user["email"]
         })
@@ -716,8 +717,9 @@ async def analyze_resume(
         )
 
     try:
+        from database.connection import DatabaseConnection
         # 1. Retrieve the resume
-        doc = resumes_collection.find_one({
+        doc = await DatabaseConnection.db["resumes"].find_one({
             "_id": ObjectId(resume_id),
             "user_email": current_user["email"]
         })
@@ -727,7 +729,7 @@ async def analyze_resume(
         # 2. Check if Celery/Redis is available for background processing
         if is_redis_available():
             # Update status to 'queued' in MongoDB
-            resumes_collection.update_one(
+            await DatabaseConnection.db["resumes"].update_one(
                 {"_id": ObjectId(resume_id)},
                 {"$set": {
                     "analysis_status": "queued",
@@ -746,7 +748,7 @@ async def analyze_resume(
 
         # Otherwise fall back to synchronous inline processing:
         # 2. Update status to 'processing'
-        resumes_collection.update_one(
+        await DatabaseConnection.db["resumes"].update_one(
             {"_id": ObjectId(resume_id)},
             {"$set": {
                 "analysis_status": "processing",
@@ -771,7 +773,7 @@ async def analyze_resume(
                 print(f"Failed to fetch file from GridFS for analysis: {e}")
 
         if not file_path or not os.path.exists(file_path):
-            resumes_collection.update_one(
+            await DatabaseConnection.db["resumes"].update_one(
                 {"_id": ObjectId(resume_id)},
                 {"$set": {"analysis_status": "failed"}}
             )
@@ -781,7 +783,7 @@ async def analyze_resume(
             # 3. Extract text
             text = extract_text(file_path)
         except Exception as e:
-            resumes_collection.update_one(
+            await DatabaseConnection.db["resumes"].update_one(
                 {"_id": ObjectId(resume_id)},
                 {"$set": {"analysis_status": "failed"}}
             )
@@ -798,7 +800,7 @@ async def analyze_resume(
         scoring = calculate_ats_score(parsed_data, text)
 
         # 5. Update resumes_collection with parsing & ATS results
-        resumes_collection.update_one(
+        await DatabaseConnection.db["resumes"].update_one(
             {"_id": ObjectId(resume_id)},
             {"$set": {
                 "parsed_text": text,
@@ -832,11 +834,24 @@ async def analyze_resume(
 
         model_name = "gemini-2.5-flash"
         strictness = "standard"
-        ai_result = await GeminiAIService.analyze_resume(
-            resume_data=resume_data,
-            model_name=model_name,
-            strictness=strictness
-        )
+        
+        async def run_ai():
+            return await GeminiAIService.analyze_resume(
+                resume_data=resume_data,
+                model_name=model_name,
+                strictness=strictness
+            )
+            
+        async def run_visual():
+            if doc.get("filename", "").lower().endswith(".pdf"):
+                try:
+                    return await MultimodalService.analyze_resume_visuals(resume_id, current_user["email"])
+                except Exception as me:
+                    print(f"Multimodal analysis skipped or failed: {me}")
+            return None
+
+        import asyncio
+        ai_result, multimodal_result = await asyncio.gather(run_ai(), run_visual())
 
         # Persist feedback in MongoDB
         feedback_doc = {
@@ -858,16 +873,8 @@ async def analyze_resume(
                 upsert=True
             )
 
-        # 7. Run Multimodal vision layout audit (only if it's a PDF)
-        multimodal_result = None
-        if doc.get("filename", "").lower().endswith(".pdf"):
-            try:
-                multimodal_result = await MultimodalService.analyze_resume_visuals(resume_id, current_user["email"])
-            except Exception as me:
-                print(f"Multimodal analysis skipped or failed: {me}")
-
         # 8. Set status to 'analyzed' and save final timestamps
-        resumes_collection.update_one(
+        await DatabaseConnection.db["resumes"].update_one(
             {"_id": ObjectId(resume_id)},
             {"$set": {
                 "analysis_status": "analyzed",

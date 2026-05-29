@@ -3,7 +3,7 @@ console.log("[API Config] BASE_URL resolved to:", BASE_URL)
 
 const activeRequests = new Map()
 
-async function dedupedFetch(url, options = {}, retries = 2, timeout = 15000) {
+async function dedupedFetch(url, options = {}, retries = 2, timeout = 60000) {
   const method = options.method || "GET"
 
   // Wrap fetch in a timeout promise
