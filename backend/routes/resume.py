@@ -53,7 +53,7 @@ async def get_current_user_optional_query(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication token is missing. Please log in."
         )
-    return get_current_user(token)
+    return await get_current_user(token)
 
 @router.post("/upload")
 async def upload_resume(
