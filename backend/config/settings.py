@@ -64,6 +64,11 @@ class Settings(BaseSettings):
         # Prefer MONGODB_URI then MONGO_URI
         uri = self.MONGODB_URI or self.MONGO_URI or os.getenv("MONGODB_URI") or os.getenv("MONGO_URI")
         
+        # FIX: Render Dashboard is aggressively overriding render.yaml with the old mongodb+srv:// URI.
+        # To bypass DNS SRV resolution timeouts, force translation to the standard seedlist URI here.
+        if uri and "mongodb+srv://sakethgudapati_db_user" in uri and "cluster0.qu6jdhv.mongodb.net" in uri:
+            uri = "mongodb://sakethgudapati_db_user:dNIJcyzIYxTfRs5L@ac-szwjtv3-shard-00-00.qu6jdhv.mongodb.net:27017,ac-szwjtv3-shard-00-01.qu6jdhv.mongodb.net:27017,ac-szwjtv3-shard-00-02.qu6jdhv.mongodb.net:27017/?authSource=admin&replicaSet=atlas-txiz5x-shard-0&tls=true"
+
         if uri:
             if self.is_production and "localhost" in uri.lower():
                 return None # Reject localhost in production even if explicitly provided
