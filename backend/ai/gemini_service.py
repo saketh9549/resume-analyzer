@@ -9,6 +9,7 @@ from ai.prompts.optimization_prompt import (
     SKILL_RECOMMENDATION_INSTRUCTION, get_skill_recommendation_prompt
 )
 from ai.response_parser import parse_ai_response
+from config.settings import settings
 
 logger = logging.getLogger(__name__)
 

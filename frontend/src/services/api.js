@@ -1,11 +1,11 @@
-export const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000"
+export const BASE_URL = import.meta.env.VITE_API_URL || "https://resume-analyzer-926x.onrender.com"
 console.log("[API Config] BASE_URL resolved to:", BASE_URL)
 
 const activeRequests = new Map()
 
 async function dedupedFetch(url, options = {}, retries = 2, timeout = 15000) {
   const method = options.method || "GET"
-  
+
   // Wrap fetch in a timeout promise
   const fetchWithTimeout = async (url, options) => {
     const controller = new AbortController();
@@ -53,6 +53,9 @@ async function dedupedFetch(url, options = {}, retries = 2, timeout = 15000) {
 
   const promise = attemptFetch(0).catch(err => {
     activeRequests.delete(key)
+    if (err.message && err.message.includes("Failed to fetch")) {
+      throw new Error("Server unavailable: Check database connectivity and Render deployment logs.")
+    }
     throw err
   })
 

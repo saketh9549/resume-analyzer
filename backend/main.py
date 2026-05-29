@@ -53,16 +53,21 @@ async def lifespan(app: FastAPI):
     env_str = "Production" if settings.is_production else settings.ENVIRONMENT.capitalize()
     logger.info(f"Environment:\n{env_str}\n")
     
-    # Check if MONGO_URI is present and not localhost
-    has_mongo = "YES" if settings.MONGO_URI and "localhost" not in settings.MONGO_URI.lower() else "NO (or localhost)"
-    logger.info(f"Mongo URI loaded:\n{has_mongo}\n")
+    # Check if MONGO_URI is present
+    mongo_source = "Environment Variable (MONGODB_URI or MONGO_URI)" if os.getenv("MONGODB_URI") or os.getenv("MONGO_URI") else "Fallback / Missing"
+    has_mongo = "YES" if settings.get_mongo_uri and "localhost" not in settings.get_mongo_uri.lower() else "NO (or localhost)"
+    logger.info(f"Mongo URI Source: {mongo_source}")
+    logger.info(f"Mongo URI Loaded: {has_mongo}\n")
     
     # Mask MONGO_URI for safe logging
-    if settings.MONGO_URI:
-        masked_uri = settings.MONGO_URI[:15] + "..." + settings.MONGO_URI[-5:]
+    if settings.get_mongo_uri:
+        masked_uri = settings.get_mongo_uri[:15] + "..." + settings.get_mongo_uri[-5:]
         logger.info(f"Masked URI: {masked_uri}")
     
     try:
+        if settings.is_production and not settings.get_mongo_uri:
+            raise RuntimeError("CRITICAL: Production deployment missing valid MONGODB_URI. Refusing startup.")
+            
         await DatabaseConnection.connect_to_database()
         logger.info("Database:\nConnected\n")
         
@@ -74,9 +79,12 @@ async def lifespan(app: FastAPI):
             logger.error(f"⚠️ Failed to seed default RAG knowledge: {se}")
     except Exception as e:
         logger.error(f"❌ CRITICAL: Failed to connect to database on startup: {e}")
-        # DO NOT call sys.exit(1). Let the app start in degraded state so /health can report it.
-        logger.error("Database:\nFailed\n")
-        logger.error("⚠️ Application running in DEGRADED mode. Check /health/db.")
+        if settings.is_production:
+            logger.critical("❌ Production mode enforced: Database connection is mandatory. Application shutting down.")
+            raise e
+        else:
+            logger.error("Database:\nFailed\n")
+            logger.error("⚠️ Application running in DEGRADED mode. Check /health/db.")
             
     yield
     await DatabaseConnection.close_database_connection()
@@ -169,12 +177,13 @@ async def health_check():
     Comprehensive health check endpoint for container orchestration (Docker/Kubernetes).
     Returns liveness status of all dependent services.
     """
-    uptime_seconds = round(time.time() - _startup_time, 1)
+    from config.settings import settings
+    env_str = "production" if settings.is_production else settings.ENVIRONMENT.lower()
+    
     health = {
         "status": "healthy",
-        "uptime_seconds": uptime_seconds,
-        "version": "2.0.0",
-        "services": {}
+        "database": "connected",
+        "environment": env_str
     }
 
     # Check Async MongoDB
@@ -182,27 +191,12 @@ async def health_check():
         from database.connection import DatabaseConnection
         if DatabaseConnection.db is not None:
             await DatabaseConnection.client.admin.command("ping")
-            health["services"]["mongodb_async"] = "online"
         else:
-            health["services"]["mongodb_async"] = "offline"
-            health["status"] = "degraded"
-    except Exception as e:
-        health["services"]["mongodb_async"] = f"error: {str(e)[:60]}"
-        health["status"] = "degraded"
-
-    # Check Redis
-    try:
-        from workers.redis_config import is_redis_active
-        health["services"]["redis"] = "online" if is_redis_active() else "offline"
+            health["status"] = "unhealthy"
+            health["database"] = "disconnected"
     except Exception:
-        health["services"]["redis"] = "offline"
-
-    # Check Celery worker (via Redis broker)
-    try:
-        from workers.celery_worker import is_redis_available
-        health["services"]["celery_broker"] = "online" if is_redis_available() else "offline"
-    except Exception:
-        health["services"]["celery_broker"] = "offline"
+        health["status"] = "unhealthy"
+        health["database"] = "disconnected"
 
     return health
 
@@ -231,11 +225,19 @@ async def health_check_env():
     Validates that essential environment variables are set correctly in production.
     Does not expose secrets.
     """
-    required_vars = ["MONGO_URI", "GEMINI_API_KEY", "JWT_SECRET"]
+    required_vars = ["MONGODB_URI", "MONGO_URI", "GEMINI_API_KEY", "JWT_SECRET"]
     env_status = {}
     missing = []
     
-    for var in required_vars:
+    # We only need one of the Mongo URIs
+    has_mongo = bool(os.getenv("MONGODB_URI") or os.getenv("MONGO_URI"))
+    if has_mongo:
+        env_status["MONGO_URI_OR_MONGODB_URI"] = "Set"
+    else:
+        env_status["MONGO_URI_OR_MONGODB_URI"] = "Missing"
+        missing.append("MONGO_URI/MONGODB_URI")
+        
+    for var in ["GEMINI_API_KEY", "JWT_SECRET"]:
         if os.getenv(var):
             env_status[var] = "Set"
         else:

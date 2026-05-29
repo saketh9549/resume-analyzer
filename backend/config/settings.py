@@ -18,6 +18,10 @@ class Settings(BaseSettings):
         default=None,
         description="MongoDB connection string. Mandatory for database."
     )
+    MONGODB_URI: Optional[str] = Field(
+        default=None,
+        description="Alternative MongoDB connection string."
+    )
     MONGO_DB: str = Field(
         default="resume_analyzer",
         description="Target MongoDB database name."
@@ -55,6 +59,21 @@ class Settings(BaseSettings):
     def is_production(self) -> bool:
         return self.ENVIRONMENT.lower() == "production" or self.RENDER
 
+    @property
+    def get_mongo_uri(self) -> Optional[str]:
+        # Prefer MONGODB_URI then MONGO_URI
+        uri = self.MONGODB_URI or self.MONGO_URI or os.getenv("MONGODB_URI") or os.getenv("MONGO_URI")
+        
+        if uri:
+            return uri
+            
+        if self.is_production:
+            # Fatal error in production
+            return None
+        
+        # Fallback for development
+        return "mongodb://localhost:27017"
+
 # Global singleton settings instance
 try:
     settings = Settings()
@@ -65,5 +84,5 @@ except Exception as e:
     logging.basicConfig(level=logging.ERROR)
     logger = logging.getLogger(__name__)
     logger.error(f"Failed to load settings: {e}")
-    # Create an empty settings object to allow failsafe boot
+    # Create an empty settings object to allow failsafe boot for everything EXCEPT database
     settings = Settings(ENVIRONMENT="development")

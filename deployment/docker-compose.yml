@@ -25,7 +25,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - MONGO_URI=mongodb://mongodb:27017
+      - MONGO_URI=mongodb+srv://sakethgudapati_db_user:dNIJcyzIYxTfRs5L@cluster0.qu6jdhv.mongodb.net/
       - REDIS_URL=redis://redis:6379/0
       - JWT_SECRET=resume_analyzer_secret_key
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
@@ -43,7 +43,7 @@ services:
     container_name: resume_analyzer_worker
     command: celery -A workers.celery_worker.celery_app worker --loglevel=info
     environment:
-      - MONGO_URI=mongodb://mongodb:27017
+      - MONGO_URI=mongodb+srv://sakethgudapati_db_user:dNIJcyzIYxTfRs5L@cluster0.qu6jdhv.mongodb.net/
       - REDIS_URL=redis://redis:6379/0
       - JWT_SECRET=resume_analyzer_secret_key
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}

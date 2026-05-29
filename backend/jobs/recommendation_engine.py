@@ -5,6 +5,7 @@ from typing import List, Dict, Any
 from functools import partial
 import google.generativeai as genai
 from ai.response_parser import parse_ai_response
+from config.settings import settings
 
 logger = logging.getLogger(__name__)
 

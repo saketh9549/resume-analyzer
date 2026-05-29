@@ -18,7 +18,7 @@ class DatabaseConnection:
         Establishes connection to MongoDB database and triggers index initialization.
         """
         if not uri:
-            uri = settings.MONGO_URI
+            uri = settings.get_mongo_uri
         if not db_name:
             db_name = settings.MONGO_DB
 

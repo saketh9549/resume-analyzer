@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 
 from config.settings import settings
 
-MONGO_URI = settings.MONGO_URI
+MONGO_URI = settings.get_mongo_uri
 MONGO_DB = settings.MONGO_DB
 
 import logging
