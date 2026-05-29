@@ -1,4 +1,5 @@
-const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000"
+export const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000"
+console.log("[API Config] BASE_URL resolved to:", BASE_URL)
 
 const activeRequests = new Map()
 

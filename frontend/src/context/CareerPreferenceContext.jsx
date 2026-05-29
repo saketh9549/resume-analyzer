@@ -1,7 +1,7 @@
 import React, { createContext, useState, useEffect, useContext } from 'react'
 
 const CareerPreferenceContext = createContext()
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000'
+import { BASE_URL } from '../services/api'
 
 function getAuthHeaders() {
   const token = localStorage.getItem('token')
