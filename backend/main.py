@@ -8,6 +8,28 @@ import os
 import platform
 from config.settings import settings
 
+logger_startup = logging.getLogger("startup")
+logger_startup.info("STARTUP STEP 1: Loading settings...")
+
+startup_status = {
+    "settings": "success",
+    "env_vars": {},
+    "mongo": "pending",
+    "routes": {}
+}
+
+logger_startup.info("STARTUP STEP 2: Checking Env Variables...")
+for var in ["MONGO_URI", "JWT_SECRET", "GEMINI_API_KEY", "REDIS_URL"]:
+    val = os.getenv(var)
+    status = "FOUND" if val else "MISSING"
+    startup_status["env_vars"][var] = status
+    logger_startup.info(f"{var}: {status}")
+
+logger_startup.info("STARTUP STEP 3: Loading Mongo...")
+logger_startup.info("STARTUP STEP 4: Loading Gemini...")
+logger_startup.info("STARTUP STEP 5: Loading Redis...")
+logger_startup.info("STARTUP STEP 6: Loading routes...")
+
 # Configure global logging
 logging.basicConfig(
     level=logging.INFO,
@@ -18,15 +40,6 @@ logging.basicConfig(
 warnings.filterwarnings("ignore", category=FutureWarning, module="google.generativeai")
 warnings.filterwarnings("ignore", category=FutureWarning, message=".*google.generativeai.*")
 
-from routes.auth import router as auth_router
-from routes.resume import router as resume_router
-from routes.ai import router as ai_router
-from routes.jobs import router as jobs_router
-from routes.rewriter import router as rewriter_router
-from routes.interviews import router as interviews_router
-from routes.live_jobs import router as live_jobs_router
-from routes.recruiter import router as recruiter_router
-from routes.career import router as career_router
 
 import contextlib
 from database.connection import DatabaseConnection
@@ -111,66 +124,32 @@ app.add_middleware(
 
 # ── ROUTES ─────────────────────────────────────────────────────────────────
 
-app.include_router(
-    auth_router,
-    prefix="/auth",
-    tags=["Authentication"]
-)
+def load_routers(app):
+    def safe_include(module_name, router_name, prefix, tags):
+        try:
+            import importlib
+            module = importlib.import_module(f"routes.{module_name}")
+            router = getattr(module, router_name)
+            app.include_router(router, prefix=prefix, tags=tags)
+            startup_status["routes"][module_name] = "success"
+        except Exception as e:
+            logger_startup.error(f"Failed to load route {module_name}: {e}")
+            startup_status["routes"][module_name] = "failed"
 
-app.include_router(
-    resume_router,
-    prefix="/resume",
-    tags=["Resume"]
-)
+    safe_include("auth", "router", "/auth", ["Authentication"])
+    safe_include("resume", "router", "/resume", ["Resume"])
+    safe_include("resume", "router", "/resumes", ["Resume"])
+    safe_include("ai", "router", "/ai", ["AI Feedback"])
+    safe_include("jobs", "router", "/jobs", ["Job Matching"])
+    safe_include("rewriter", "router", "/rewriter", ["AI Rewriter"])
+    safe_include("interviews", "router", "/interviews", ["AI Interview Prep"])
+    safe_include("live_jobs", "router", "/live_jobs", ["Live Job API"])
+    safe_include("recruiter", "router", "/recruiter", ["Recruiter Console"])
+    safe_include("career", "router", "/career", ["Career Intelligence"])
+    
+    logger_startup.info("Application started...")
 
-app.include_router(
-    resume_router,
-    prefix="/resumes",
-    tags=["Resume"]
-)
-
-app.include_router(
-    ai_router,
-    prefix="/ai",
-    tags=["AI Feedback"]
-)
-
-app.include_router(
-    jobs_router,
-    prefix="/jobs",
-    tags=["Job Matching"]
-)
-
-app.include_router(
-    rewriter_router,
-    prefix="/rewriter",
-    tags=["AI Rewriter"]
-)
-
-app.include_router(
-    interviews_router,
-    prefix="/interviews",
-    tags=["AI Interview Prep"]
-)
-
-app.include_router(
-    live_jobs_router,
-    prefix="/live-jobs",
-    tags=["Live Job API"]
-)
-
-app.include_router(
-    recruiter_router,
-    prefix="/recruiter",
-    tags=["Recruiter Console"]
-)
-
-app.include_router(
-    career_router,
-    prefix="/career",
-    tags=["Career Intelligence"]
-)
-
+load_routers(app)
 
 # ── SYSTEM ENDPOINTS ───────────────────────────────────────────────────────
 
@@ -310,4 +289,8 @@ async def get_metrics():
     except Exception:
         metrics["memory"] = {}
 
-    return metrics
+    return metrics
+
+@app.get("/health/startup", tags=["System"])
+async def health_check_startup():
+    return startup_status

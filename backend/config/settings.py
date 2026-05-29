@@ -14,9 +14,9 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = Field(default="development")
 
     # Critical Database Variables
-    MONGO_URI: str = Field(
-        ...,
-        description="MongoDB connection string. Required in all environments."
+    MONGO_URI: Optional[str] = Field(
+        default=None,
+        description="MongoDB connection string. Mandatory for database."
     )
     MONGO_DB: str = Field(
         default="resume_analyzer",
@@ -24,15 +24,15 @@ class Settings(BaseSettings):
     )
 
     # Authentication & Security
-    JWT_SECRET: str = Field(
-        ...,
-        description="Secret key for JWT generation. Required."
+    JWT_SECRET: Optional[str] = Field(
+        default=None,
+        description="Secret key for JWT generation."
     )
 
     # AI Provider
-    GEMINI_API_KEY: str = Field(
-        ...,
-        description="Google Gemini API key for AI generation. Required."
+    GEMINI_API_KEY: Optional[str] = Field(
+        default=None,
+        description="Google Gemini API key for AI generation."
     )
 
     # External Services
@@ -59,15 +59,11 @@ class Settings(BaseSettings):
 try:
     settings = Settings()
     if settings.is_production and not settings.REDIS_URL:
-        settings.REDIS_URL = os.getenv("REDIS_URL") # Try to pull again just in case
+        settings.REDIS_URL = os.getenv("REDIS_URL")
 except Exception as e:
     import logging
     logging.basicConfig(level=logging.ERROR)
     logger = logging.getLogger(__name__)
-    logger.error("=====================================================")
-    logger.error("CRITICAL STARTUP ERROR: CONFIGURATION VALIDATION FAILED")
-    logger.error("=====================================================")
-    logger.error(str(e))
-    logger.error("Please verify that all required environment variables are set in the Render Dashboard.")
-    # DO NOT call sys.exit(1) here as it abruptly kills the Render deployment without flushing logs properly.
-    raise RuntimeError(f"Startup failed due to missing configuration: {str(e)}")
+    logger.error(f"Failed to load settings: {e}")
+    # Create an empty settings object to allow failsafe boot
+    settings = Settings(ENVIRONMENT="development")

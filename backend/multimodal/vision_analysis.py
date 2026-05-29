@@ -10,6 +10,7 @@ warnings.simplefilter("ignore", category=FutureWarning)
 import google.generativeai as genai
 warnings.filters = _original_filters
 from ai.response_parser import parse_ai_response
+from config.settings import settings
 
 logger = logging.getLogger(__name__)
 
